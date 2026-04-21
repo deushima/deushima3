@@ -5,9 +5,9 @@ import * as THREE from 'three';
         import GUI from 'lil-gui';
 
         // --- INITIAL CONFIGURATION ---
-        // Set your custom SVG URL here to load it automatically on startup.
-        // Leave empty ('') to use the default Apple logo.
+        // Inline startup SVG avoids file:// loading issues when opening index.html directly.
         const INITIAL_SVG_URL = './deushima.svg.svg'; 
+        const INLINE_INITIAL_SVG = document.getElementById('initialSvgData')?.textContent?.trim() || '';
 
         // --- GLSL NOISE FUNCTION ---
         const simplex3D = `
@@ -360,7 +360,7 @@ import * as THREE from 'three';
 
         function loadSVGFromURL(url) {
             if (!url || url.trim() === '') {
-                loadSVGFromString(appleSVG);
+                loadSVGFromString(INLINE_INITIAL_SVG || appleSVG);
                 return;
             }
             svgLoader.load(
@@ -370,8 +370,8 @@ import * as THREE from 'three';
                 },
                 undefined,
                 (error) => {
-                    console.error('Error loading SVG from URL. Falling back to default logo.', error);
-                    loadSVGFromString(appleSVG);
+                    console.error('Error loading SVG from URL. Falling back to embedded default logo.', error);
+                    loadSVGFromString(INLINE_INITIAL_SVG || appleSVG);
                 }
             );
         }
@@ -384,7 +384,9 @@ import * as THREE from 'three';
         `;
         
         // --- INITIAL STARTUP ---
-        if (INITIAL_SVG_URL && INITIAL_SVG_URL.trim() !== '') {
+        if (INLINE_INITIAL_SVG) {
+            loadSVGFromString(INLINE_INITIAL_SVG);
+        } else if (INITIAL_SVG_URL && INITIAL_SVG_URL.trim() !== '') {
             loadSVGFromURL(INITIAL_SVG_URL);
         } else {
             loadSVGFromString(appleSVG);
@@ -429,7 +431,11 @@ import * as THREE from 'three';
             uploadSVG: () => { fileInput.click(); },
             resetDefault: () => { 
                 fileSettings.svgUrl = INITIAL_SVG_URL;
-                loadSVGFromURL(INITIAL_SVG_URL); 
+                if (INLINE_INITIAL_SVG) {
+                    loadSVGFromString(INLINE_INITIAL_SVG);
+                } else {
+                    loadSVGFromURL(INITIAL_SVG_URL);
+                }
             }
         };
         
