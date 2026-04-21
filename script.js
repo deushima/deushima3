@@ -2,6 +2,11 @@ import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
         import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { RGBShiftShader } from 'three/addons/shaders/RGBShiftShader.js';
         import GUI from 'lil-gui';
 
         // --- INITIAL CONFIGURATION ---
@@ -68,20 +73,57 @@ import * as THREE from 'three';
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(0, 0, 55);
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.3; 
         document.body.appendChild(renderer.domElement);
 
+        const glowSettings = {
+            enabled: true,
+            strength: 0.14,
+            radius: 0.16,
+            threshold: 0.32
+        };
+
+        const chromaticSettings = {
+            enabled: true,
+            intensity: 0.0021,
+            angle: 1.48,
+            chromeLevel: 0.87,
+            preset: 'balanced'
+        };
+
+        const composer = new EffectComposer(renderer);
+        composer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        composer.setSize(window.innerWidth, window.innerHeight);
+
+        const renderPass = new RenderPass(scene, camera);
+        composer.addPass(renderPass);
+
+        const bloomPass = new UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            glowSettings.strength,
+            glowSettings.radius,
+            glowSettings.threshold
+        );
+        composer.addPass(bloomPass);
+
+        const rgbShiftPass = new ShaderPass(RGBShiftShader);
+        rgbShiftPass.uniforms.amount.value = chromaticSettings.intensity;
+        rgbShiftPass.uniforms.angle.value = chromaticSettings.angle;
+        composer.addPass(rgbShiftPass);
+
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
 
         const pmremGenerator = new THREE.PMREMGenerator(renderer);
+        const textureLoader = new THREE.TextureLoader();
         const roomEnvironment = new RoomEnvironment();
-        scene.environment = pmremGenerator.fromScene(roomEnvironment).texture;
+        const defaultEnvironmentTexture = pmremGenerator.fromScene(roomEnvironment).texture;
+        scene.environment = defaultEnvironmentTexture;
 
         const dirLight1 = new THREE.DirectionalLight(0xffffff, 3);
         dirLight1.position.set(10, 20, 10);
@@ -97,24 +139,133 @@ import * as THREE from 'three';
 
         const liquidMaterial = new THREE.MeshPhysicalMaterial({
             color: 0xeeeeee,       
-            metalness: 0.587,
-            roughness: 0.452,       
-            clearcoat: 0.071,        
-            clearcoatRoughness: 0.0,
-            iridescence: 0.907,      
-            iridescenceIOR: 1.0,   
-            iridescenceThicknessRange: [759, 800], 
+            metalness: 0.18,
+            roughness: 0.18,       
+            clearcoat: 0.42,        
+            clearcoatRoughness: 0.03,
+            iridescence: 0.28,      
+            iridescenceIOR: 1.08,   
+            iridescenceThicknessRange: [420, 560], 
             iridescenceThicknessMap: dummyTex,
+            transmission: 0.72,
+            thickness: 2.4,
+            ior: 1.42,
+            reflectivity: 0.72,
+            envMapIntensity: 1.35,
+            specularIntensity: 1.0,
+            attenuationDistance: 0.65,
+            attenuationColor: new THREE.Color('#d3d6eb'),
             dithering: true // CRITICAL FIX: Eliminates 8-bit color banding/staircasing in subtle gradients!
         });
+
+        const baseMaterialSnapshot = {
+            metalness: liquidMaterial.metalness,
+            reflectivity: liquidMaterial.reflectivity,
+            envMapIntensity: liquidMaterial.envMapIntensity,
+            clearcoat: liquidMaterial.clearcoat,
+            iridescence: liquidMaterial.iridescence
+        };
+
+        const glassSettings = {
+            enabled: true,
+            transmission: liquidMaterial.transmission,
+            thickness: liquidMaterial.thickness,
+            ior: liquidMaterial.ior,
+            reflectivity: liquidMaterial.reflectivity,
+            envMapIntensity: liquidMaterial.envMapIntensity,
+            attenuationDistance: liquidMaterial.attenuationDistance,
+            attenuationColor: '#d3d6eb'
+        };
+
+        const bevelSettings = {
+            enableBevelDynamics: false,
+            bevelSize: 2.5,
+            bevelThickness: 2.5,
+            bevelSegments: 96,
+            bevelFlowInfluence: 1.0
+        };
+
+        const environmentTextureSettings = {
+            enabled: false,
+            affectLogo: false,
+            affectBackground: false,
+            envIntensity: liquidMaterial.envMapIntensity,
+            uploadTexture: () => { textureInput.click(); },
+            clearTexture: () => {
+                if (uploadedEnvironmentTexture) {
+                    uploadedEnvironmentTexture.dispose();
+                    uploadedEnvironmentTexture = null;
+                }
+                if (uploadedEnvironmentTarget) {
+                    uploadedEnvironmentTarget.dispose();
+                    uploadedEnvironmentTarget = null;
+                }
+                environmentTextureSettings.enabled = false;
+                environmentTextureSettings.affectLogo = false;
+                environmentTextureSettings.affectBackground = false;
+                applyEnvironmentTextureState();
+                for (const controller of environmentFolder.controllers) {
+                    controller.updateDisplay();
+                }
+            }
+        };
+
+        let uploadedEnvironmentTexture = null;
+        let uploadedEnvironmentTarget = null;
+
+        function applyEnvironmentTextureState() {
+            const hasUploadedEnvironment = Boolean(uploadedEnvironmentTarget);
+
+            if (environmentTextureSettings.enabled && hasUploadedEnvironment) {
+                scene.environment = uploadedEnvironmentTarget.texture;
+                if (environmentTextureSettings.affectBackground) {
+                    scene.background = uploadedEnvironmentTexture;
+                } else {
+                    scene.background = new THREE.Color(sceneSettings.bgColor);
+                }
+            } else {
+                scene.environment = defaultEnvironmentTexture;
+                scene.background = new THREE.Color(sceneSettings.bgColor);
+            }
+
+            liquidMaterial.envMapIntensity = environmentTextureSettings.envIntensity;
+
+            if (environmentTextureSettings.enabled && environmentTextureSettings.affectLogo && uploadedEnvironmentTexture) {
+                liquidMaterial.map = uploadedEnvironmentTexture;
+                liquidMaterial.needsUpdate = true;
+            } else if (liquidMaterial.map) {
+                liquidMaterial.map = null;
+                liquidMaterial.needsUpdate = true;
+            }
+        }
+
+        function loadEnvironmentTextureFromDataUrl(dataUrl) {
+            textureLoader.load(dataUrl, (texture) => {
+                if (uploadedEnvironmentTexture) {
+                    uploadedEnvironmentTexture.dispose();
+                }
+                if (uploadedEnvironmentTarget) {
+                    uploadedEnvironmentTarget.dispose();
+                }
+
+                texture.colorSpace = THREE.SRGBColorSpace;
+                texture.mapping = THREE.EquirectangularReflectionMapping;
+                texture.needsUpdate = true;
+
+                uploadedEnvironmentTexture = texture;
+                uploadedEnvironmentTarget = pmremGenerator.fromEquirectangular(texture);
+                applyEnvironmentTextureState();
+            });
+        }
 
         liquidMaterial.userData = {
             uTime: { value: 0 },
             uSpeed: { value: 0.0 },         
             uScale: { value: 0.00298 },       
-            uDistortion: { value: 1.52 },    
+            uDistortion: { value: 0.68 },    
             uEdgeProtection: { value: 1.0 }, 
-            uShapeReactivity: { value: 1.0 },
+            uShapeReactivity: { value: 0.42 },
+            uBevelFlowMix: { value: 0.0 },
             uShapeMask: { value: dummyTex },
             uShapeBounds: { value: new THREE.Vector4(0,0,1,1) }
         };
@@ -126,6 +277,7 @@ import * as THREE from 'three';
             shader.uniforms.uDistortion = liquidMaterial.userData.uDistortion;
             shader.uniforms.uEdgeProtection = liquidMaterial.userData.uEdgeProtection;
             shader.uniforms.uShapeReactivity = liquidMaterial.userData.uShapeReactivity;
+            shader.uniforms.uBevelFlowMix = liquidMaterial.userData.uBevelFlowMix;
             shader.uniforms.uShapeMask = liquidMaterial.userData.uShapeMask;
             shader.uniforms.uShapeBounds = liquidMaterial.userData.uShapeBounds;
 
@@ -152,6 +304,7 @@ import * as THREE from 'three';
                 uniform float uDistortion;
                 uniform float uEdgeProtection;
                 uniform float uShapeReactivity;
+                uniform float uBevelFlowMix;
                 
                 uniform sampler2D uShapeMask;
                 uniform vec4 uShapeBounds;
@@ -183,6 +336,7 @@ import * as THREE from 'three';
                 float maskB = texture2D(uShapeMask, shapeUV - vec2(0.0, texEps.y)).r;
                 
                 float smoothDist = (maskC + maskR + maskL + maskT + maskB) * 0.2;
+                float bevelRedirect = 1.0 - smoothstep(0.18, 0.82, smoothDist);
                 
                 // Smoothed gradient using central difference
                 vec2 maskGrad = vec2(maskR - maskL, maskT - maskB) / (2.0 * texEps.x);
@@ -194,7 +348,8 @@ import * as THREE from 'three';
                 
                 // Flow along contours
                 vec2 contourTangent = vec2(-maskGrad.y, maskGrad.x);
-                p.xy += contourTangent * (uTime * uSpeed * 0.5);
+                float contourFlow = 0.5 + bevelRedirect * uBevelFlowMix * 1.6;
+                p.xy += contourTangent * (uTime * uSpeed * contourFlow);
                 p.y -= uTime * uSpeed * 0.1;
                 
                 // Domain Warping
@@ -220,7 +375,8 @@ import * as THREE from 'three';
                 float isFlatFace = smoothstep(0.1, 0.9, abs(vOriginalNormal.z));
                 float edgeMask = mix(1.0, isFlatFace, uEdgeProtection);
 
-                normal = normalize(normal + viewNoiseNormal * uDistortion * edgeMask);
+                float bevelNormalMix = 1.0 - bevelRedirect * uBevelFlowMix * 0.45;
+                normal = normalize(normal + viewNoiseNormal * uDistortion * edgeMask * bevelNormalMix);
                 `
             );
 
@@ -292,11 +448,117 @@ import * as THREE from 'three';
         }
 
         // --- SVG HANDLING ---
+        const geometrySettings = {
+            depth: 100.0,
+            bevelEnabled: true,
+            bevelSegments: bevelSettings.bevelSegments,
+            steps: 2,
+            bevelSize: bevelSettings.bevelSize,
+            bevelThickness: bevelSettings.bevelThickness
+        };
+
         const svgGroup = new THREE.Group();
         scene.add(svgGroup);
         const svgLoader = new SVGLoader();
+        let currentSVGData = null;
+
+        function downloadDataUrl(dataUrl, filename) {
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        }
+
+        function exportPNG({ transparent = false } = {}) {
+            const originalBackground = scene.background;
+            const originalClearAlpha = renderer.getClearAlpha();
+
+            if (transparent) {
+                scene.background = null;
+                renderer.setClearAlpha(0);
+            } else {
+                scene.background = new THREE.Color(sceneSettings.bgColor);
+                renderer.setClearAlpha(1);
+            }
+
+            composer.render();
+
+            const suffix = transparent ? 'transparent' : 'background';
+            const dataUrl = renderer.domElement.toDataURL('image/png');
+            downloadDataUrl(dataUrl, `deushima-${suffix}.png`);
+
+            scene.background = originalBackground;
+            renderer.setClearAlpha(originalClearAlpha);
+            composer.render();
+        }
+
+        function applyChromaticPreset(preset) {
+            const presets = {
+                subtle: { intensity: 0.0006, angle: 0.0 },
+                balanced: { intensity: 0.0021, angle: 1.48 },
+                prism: { intensity: 0.0024, angle: 0.8 },
+                glitch: { intensity: 0.0042, angle: 1.57 }
+            };
+            const next = presets[preset] || presets.balanced;
+            chromaticSettings.intensity = next.intensity;
+            chromaticSettings.angle = next.angle;
+            rgbShiftPass.uniforms.amount.value = chromaticSettings.enabled ? next.intensity : 0.0;
+            rgbShiftPass.uniforms.angle.value = next.angle;
+            for (const controller of chromaticFolder.controllers) {
+                controller.updateDisplay();
+            }
+        }
+
+        function applyGlowState() {
+            bloomPass.enabled = glowSettings.enabled;
+            bloomPass.strength = glowSettings.enabled ? glowSettings.strength : 0.0;
+        }
+
+        function applyChromaticState() {
+            rgbShiftPass.enabled = chromaticSettings.enabled;
+            rgbShiftPass.uniforms.amount.value = chromaticSettings.enabled ? chromaticSettings.intensity : 0.0;
+            rgbShiftPass.uniforms.angle.value = chromaticSettings.angle;
+        }
+
+        function applyGlassState() {
+            if (glassSettings.enabled) {
+                liquidMaterial.transmission = glassSettings.transmission;
+                liquidMaterial.thickness = glassSettings.thickness;
+                liquidMaterial.ior = glassSettings.ior;
+                liquidMaterial.reflectivity = glassSettings.reflectivity;
+                liquidMaterial.envMapIntensity = glassSettings.envMapIntensity;
+                liquidMaterial.attenuationDistance = glassSettings.attenuationDistance;
+                liquidMaterial.attenuationColor.set(glassSettings.attenuationColor);
+            } else {
+                liquidMaterial.transmission = 0.0;
+                liquidMaterial.thickness = 0.0;
+                liquidMaterial.attenuationDistance = 1000;
+            }
+            liquidMaterial.needsUpdate = true;
+        }
+
+        function applyChromeLevel() {
+            const chromeBoost = chromaticSettings.chromeLevel;
+            liquidMaterial.metalness = Math.min(1, baseMaterialSnapshot.metalness + chromeBoost * 0.22);
+            liquidMaterial.reflectivity = Math.min(1, baseMaterialSnapshot.reflectivity + chromeBoost * 0.16);
+            liquidMaterial.envMapIntensity = environmentTextureSettings.enabled
+                ? environmentTextureSettings.envIntensity
+                : baseMaterialSnapshot.envMapIntensity + chromeBoost * 0.55;
+            liquidMaterial.clearcoat = Math.min(1, baseMaterialSnapshot.clearcoat + chromeBoost * 0.18);
+            liquidMaterial.iridescence = Math.min(1, baseMaterialSnapshot.iridescence + chromeBoost * 0.16);
+        }
+
+        function rebuildCurrentSVG() {
+            if (currentSVGData) {
+                buildSVGFromData(currentSVGData);
+            }
+        }
 
         function buildSVGFromData(svgData) {
+            currentSVGData = svgData;
+
             // Reset existing group transformation so scaling math works flawlessly
             svgGroup.position.set(0, 0, 0);
             svgGroup.scale.set(1, 1, 1);
@@ -310,12 +572,12 @@ import * as THREE from 'three';
             }
 
             const extrudeSettings = {
-                depth: 1.5,
-                bevelEnabled: true,
-                bevelSegments: 96, 
-                steps: 2,
-                bevelSize: 2.5,    
-                bevelThickness: 2.5
+                depth: geometrySettings.depth,
+                bevelEnabled: geometrySettings.bevelEnabled,
+                bevelSegments: bevelSettings.bevelSegments,
+                steps: geometrySettings.steps,
+                bevelSize: bevelSettings.bevelSize,
+                bevelThickness: bevelSettings.bevelThickness
             };
 
             const allShapes = [];
@@ -411,7 +673,7 @@ import * as THREE from 'three';
         iridescenceFolder.add(liquidMaterial, 'iridescence', 0.0, 1.0).name('Intensity');
         iridescenceFolder.add(liquidMaterial, 'iridescenceIOR', 1.0, 3.0).name('Index of Refraction');
         
-        const thicknessProxy = { min: 759, max: 800 };
+        const thicknessProxy = { min: 420, max: 560 };
         iridescenceFolder.add(thicknessProxy, 'min', 0, 1500).name('Thickness Min').onChange(v => {
             liquidMaterial.iridescenceThicknessRange[0] = v;
         });
@@ -424,11 +686,93 @@ import * as THREE from 'three';
         materialFolder.add(liquidMaterial, 'metalness', 0.0, 1.0).name('Metalness');
         materialFolder.add(liquidMaterial, 'clearcoat', 0.0, 1.0).name('Clearcoat');
 
+        const glassFolder = gui.addFolder('Glass Texture');
+        glassFolder.add(glassSettings, 'enabled').name('Enable Glass').onChange(() => {
+            applyGlassState();
+        });
+        glassFolder.add(glassSettings, 'transmission', 0.0, 1.0, 0.01).name('Transmission').onChange(v => {
+            liquidMaterial.transmission = v;
+        });
+        glassFolder.add(glassSettings, 'thickness', 0.0, 8.0, 0.01).name('Glass Thickness').onChange(v => {
+            liquidMaterial.thickness = v;
+        });
+        glassFolder.add(glassSettings, 'ior', 1.0, 2.5, 0.01).name('Glass IOR').onChange(v => {
+            liquidMaterial.ior = v;
+        });
+        glassFolder.add(glassSettings, 'reflectivity', 0.0, 1.0, 0.01).name('Reflectivity').onChange(v => {
+            liquidMaterial.reflectivity = v;
+        });
+        glassFolder.add(glassSettings, 'envMapIntensity', 0.0, 3.0, 0.01).name('Env Reflection').onChange(v => {
+            liquidMaterial.envMapIntensity = v;
+        });
+        glassFolder.add(glassSettings, 'attenuationDistance', 0.0, 3.0, 0.01).name('Tint Distance').onChange(v => {
+            liquidMaterial.attenuationDistance = v;
+        });
+        glassFolder.addColor(glassSettings, 'attenuationColor').name('Glass Tint').onChange(v => {
+            liquidMaterial.attenuationColor.set(v);
+        });
+
+        const glowFolder = gui.addFolder('Glow');
+        glowFolder.add(glowSettings, 'enabled').name('Enable Glow').onChange(() => {
+            applyGlowState();
+        });
+        glowFolder.add(glowSettings, 'strength', 0.0, 2.5, 0.01).name('Glow Strength').onChange(v => {
+            bloomPass.strength = v;
+        });
+        glowFolder.add(glowSettings, 'radius', 0.0, 1.0, 0.01).name('Glow Radius').onChange(v => {
+            bloomPass.radius = v;
+        });
+        glowFolder.add(glowSettings, 'threshold', 0.0, 1.0, 0.01).name('Glow Threshold').onChange(v => {
+            bloomPass.threshold = v;
+        });
+
+        const chromaticFolder = gui.addFolder('Chromatic');
+        chromaticFolder.add(chromaticSettings, 'enabled').name('Enable Chromatic').onChange(() => {
+            applyChromaticState();
+        });
+        chromaticFolder.add(chromaticSettings, 'intensity', 0.0, 0.01, 0.0001).name('Chromatic FX').onChange(v => {
+            rgbShiftPass.uniforms.amount.value = chromaticSettings.enabled ? v : 0.0;
+        });
+        chromaticFolder.add(chromaticSettings, 'angle', 0.0, 6.2832, 0.01).name('Chromatic Angle').onChange(v => {
+            rgbShiftPass.uniforms.angle.value = v;
+        });
+        chromaticFolder.add(chromaticSettings, 'chromeLevel', 0.0, 2.0, 0.01).name('Chrome Level').onChange(() => {
+            applyChromeLevel();
+        });
+        chromaticFolder.add(chromaticSettings, 'preset', ['subtle', 'balanced', 'prism', 'glitch']).name('Variation').onChange(v => {
+            applyChromaticPreset(v);
+        });
+
+        const geometryFolder = gui.addFolder('Geometry');
+        geometryFolder.add(geometrySettings, 'depth', 20.0, 1200.0, 10.0).name('Extrude Depth').onChange(() => {
+            rebuildCurrentSVG();
+        });
+        geometryFolder.add(bevelSettings, 'bevelSize', 0.0, 12.0, 0.1).name('Bevel Size').onChange(() => {
+            rebuildCurrentSVG();
+        });
+        geometryFolder.add(bevelSettings, 'bevelThickness', 0.0, 12.0, 0.1).name('Bevel Thickness').onChange(() => {
+            rebuildCurrentSVG();
+        });
+        geometryFolder.add(bevelSettings, 'bevelSegments', 1, 128, 1).name('Bevel Segments').onChange(() => {
+            rebuildCurrentSVG();
+        });
+
+        const bevelFolder = gui.addFolder('Bevel Dynamics');
+        bevelFolder.add(bevelSettings, 'enableBevelDynamics').name('Enable Redirect').onChange((v) => {
+            liquidMaterial.userData.uBevelFlowMix.value = v ? bevelSettings.bevelFlowInfluence : 0.0;
+        });
+        bevelFolder.add(bevelSettings, 'bevelFlowInfluence', 0.0, 3.0, 0.01).name('Redirect Strength').onChange((v) => {
+            liquidMaterial.userData.uBevelFlowMix.value = bevelSettings.enableBevelDynamics ? v : 0.0;
+        });
+
         const fileInput = document.getElementById('fileInput');
+        const textureInput = document.getElementById('textureInput');
         const fileSettings = {
             svgUrl: INITIAL_SVG_URL,
             loadUrl: () => { loadSVGFromURL(fileSettings.svgUrl); },
             uploadSVG: () => { fileInput.click(); },
+            exportWithBackground: () => { exportPNG({ transparent: false }); },
+            exportTransparent: () => { exportPNG({ transparent: true }); },
             resetDefault: () => { 
                 fileSettings.svgUrl = INITIAL_SVG_URL;
                 if (INLINE_INITIAL_SVG) {
@@ -438,11 +782,29 @@ import * as THREE from 'three';
                 }
             }
         };
+
+        const environmentFolder = gui.addFolder('Environment Texture');
+        environmentFolder.add(environmentTextureSettings, 'enabled').name('Enable Texture').onChange(() => {
+            applyEnvironmentTextureState();
+        });
+        environmentFolder.add(environmentTextureSettings, 'affectLogo').name('Affect Logo').onChange(() => {
+            applyEnvironmentTextureState();
+        });
+        environmentFolder.add(environmentTextureSettings, 'affectBackground').name('Affect Background').onChange(() => {
+            applyEnvironmentTextureState();
+        });
+        environmentFolder.add(environmentTextureSettings, 'envIntensity', 0.0, 4.0, 0.01).name('Env Influence').onChange(() => {
+            applyEnvironmentTextureState();
+        });
+        environmentFolder.add(environmentTextureSettings, 'uploadTexture').name('Upload PNG Texture');
+        environmentFolder.add(environmentTextureSettings, 'clearTexture').name('Clear Texture');
         
         const fileFolder = gui.addFolder('File Management');
         fileFolder.add(fileSettings, 'svgUrl').name('SVG URL');
         fileFolder.add(fileSettings, 'loadUrl').name('Load from URL');
         fileFolder.add(fileSettings, 'uploadSVG').name('Upload Custom SVG');
+        fileFolder.add(fileSettings, 'exportWithBackground').name('Export PNG + BG');
+        fileFolder.add(fileSettings, 'exportTransparent').name('Export PNG Transparent');
         fileFolder.add(fileSettings, 'resetDefault').name('Reset Logo');
 
         fileInput.addEventListener('change', (event) => {
@@ -455,6 +817,21 @@ import * as THREE from 'three';
             event.target.value = '';
         });
 
+        textureInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => loadEnvironmentTextureFromDataUrl(e.target.result);
+                reader.readAsDataURL(file);
+            }
+            event.target.value = '';
+        });
+
+        applyChromeLevel();
+        applyGlassState();
+        applyGlowState();
+        applyChromaticState();
+
         // --- ANIMATION LOOP ---
         const clock = new THREE.Clock();
 
@@ -462,13 +839,53 @@ import * as THREE from 'three';
             requestAnimationFrame(animate);
             controls.update();
             liquidMaterial.userData.uTime.value = clock.getElapsedTime();
-            renderer.render(scene, camera);
+            composer.render();
         }
 
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+            bloomPass.setSize(window.innerWidth, window.innerHeight);
         });
+
+        // --- CURSOR FOLLOWER ---
+        if (window.matchMedia('(pointer: fine)').matches) {
+            const followerEl = document.createElement('div');
+            followerEl.className = 'cursor-follower';
+            document.body.appendChild(followerEl);
+
+            const pointer = { x: window.innerWidth * 0.5, y: window.innerHeight * 0.5 };
+            const follower = { x: pointer.x, y: pointer.y };
+
+            const setXY = (el, x, y, scale = 1) => {
+                el.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
+            };
+
+            window.addEventListener('pointermove', (event) => {
+                pointer.x = event.clientX;
+                pointer.y = event.clientY;
+                followerEl.style.opacity = '0.7';
+            });
+
+            window.addEventListener('pointerleave', () => {
+                followerEl.style.opacity = '0';
+            });
+
+            window.addEventListener('pointerenter', () => {
+                followerEl.style.opacity = '0.7';
+            });
+
+            function animateCursor() {
+                follower.x += (pointer.x - follower.x) * 0.055;
+                follower.y += (pointer.y - follower.y) * 0.055;
+                setXY(followerEl, follower.x, follower.y, 1);
+
+                requestAnimationFrame(animateCursor);
+            }
+
+            animateCursor();
+        }
 
         animate();
