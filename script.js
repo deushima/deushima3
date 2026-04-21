@@ -7,7 +7,7 @@ import * as THREE from 'three';
         // --- INITIAL CONFIGURATION ---
         // Set your custom SVG URL here to load it automatically on startup.
         // Leave empty ('') to use the default Apple logo.
-        const INITIAL_SVG_URL = './deushima.svg'; 
+        const INITIAL_SVG_URL = './deushima.svg.svg'; 
 
         // --- GLSL NOISE FUNCTION ---
         const simplex3D = `
@@ -428,8 +428,8 @@ import * as THREE from 'three';
             loadUrl: () => { loadSVGFromURL(fileSettings.svgUrl); },
             uploadSVG: () => { fileInput.click(); },
             resetDefault: () => { 
-                fileSettings.svgUrl = '';
-                loadSVGFromString(appleSVG); 
+                fileSettings.svgUrl = INITIAL_SVG_URL;
+                loadSVGFromURL(INITIAL_SVG_URL); 
             }
         };
         
