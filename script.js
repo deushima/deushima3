@@ -156,6 +156,11 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             mode: 0
         };
 
+        const edgeSmoothSettings = {
+            enabled: true,
+            strength: 0.85
+        };
+
         const export360Settings = {
             duration: 6,
             fps: 30,
@@ -362,6 +367,73 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         pixelScanPass.enabled = pixelScanIntroSettings.enabled;
         composer.addPass(pixelScanPass);
 
+        const edgeSmoothPass = new ShaderPass({
+            uniforms: {
+                tDiffuse: { value: null },
+                resolution: { value: new THREE.Vector2(1 / initialViewport.width, 1 / initialViewport.height) },
+                uStrength: { value: edgeSmoothSettings.strength }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D tDiffuse;
+                uniform vec2 resolution;
+                uniform float uStrength;
+                varying vec2 vUv;
+
+                #define FXAA_REDUCE_MIN (1.0 / 128.0)
+                #define FXAA_REDUCE_MUL (1.0 / 8.0)
+                #define FXAA_SPAN_MAX 8.0
+
+                void main() {
+                    vec4 original = texture2D(tDiffuse, vUv);
+
+                    vec3 rgbNW = texture2D(tDiffuse, vUv + vec2(-1.0, -1.0) * resolution).xyz;
+                    vec3 rgbNE = texture2D(tDiffuse, vUv + vec2(1.0, -1.0) * resolution).xyz;
+                    vec3 rgbSW = texture2D(tDiffuse, vUv + vec2(-1.0, 1.0) * resolution).xyz;
+                    vec3 rgbSE = texture2D(tDiffuse, vUv + vec2(1.0, 1.0) * resolution).xyz;
+                    vec3 rgbM = original.xyz;
+                    vec3 luma = vec3(0.299, 0.587, 0.114);
+
+                    float lumaNW = dot(rgbNW, luma);
+                    float lumaNE = dot(rgbNE, luma);
+                    float lumaSW = dot(rgbSW, luma);
+                    float lumaSE = dot(rgbSE, luma);
+                    float lumaM = dot(rgbM, luma);
+                    float lumaMin = min(lumaM, min(min(lumaNW, lumaNE), min(lumaSW, lumaSE)));
+                    float lumaMax = max(lumaM, max(max(lumaNW, lumaNE), max(lumaSW, lumaSE)));
+
+                    vec2 dir;
+                    dir.x = -((lumaNW + lumaNE) - (lumaSW + lumaSE));
+                    dir.y = ((lumaNW + lumaSW) - (lumaNE + lumaSE));
+
+                    float dirReduce = max((lumaNW + lumaNE + lumaSW + lumaSE) * (0.25 * FXAA_REDUCE_MUL), FXAA_REDUCE_MIN);
+                    float rcpDirMin = 1.0 / (min(abs(dir.x), abs(dir.y)) + dirReduce);
+                    dir = min(vec2(FXAA_SPAN_MAX), max(vec2(-FXAA_SPAN_MAX), dir * rcpDirMin)) * resolution;
+
+                    vec3 rgbA = 0.5 * (
+                        texture2D(tDiffuse, vUv + dir * (1.0 / 3.0 - 0.5)).xyz +
+                        texture2D(tDiffuse, vUv + dir * (2.0 / 3.0 - 0.5)).xyz
+                    );
+                    vec3 rgbB = rgbA * 0.5 + 0.25 * (
+                        texture2D(tDiffuse, vUv + dir * -0.5).xyz +
+                        texture2D(tDiffuse, vUv + dir * 0.5).xyz
+                    );
+
+                    float lumaB = dot(rgbB, luma);
+                    vec3 smoothed = (lumaB < lumaMin || lumaB > lumaMax) ? rgbA : rgbB;
+                    gl_FragColor = vec4(mix(original.rgb, smoothed, uStrength), original.a);
+                }
+            `
+        });
+        edgeSmoothPass.enabled = edgeSmoothSettings.enabled;
+        composer.addPass(edgeSmoothPass);
+
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
@@ -422,6 +494,12 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             envMapIntensity: liquidMaterial.envMapIntensity,
             attenuationDistance: liquidMaterial.attenuationDistance,
             attenuationColor: '#e8fafd'
+        };
+
+        const structureFillSettings = {
+            enabled: false,
+            color: '#cfd2d4',
+            strength: 0.75
         };
 
         const bevelSettings = {
@@ -515,6 +593,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             uEdgeProtection: { value: 0.138 }, 
             uShapeReactivity: { value: 0.32 },
             uBevelFlowMix: { value: 0.0 },
+            uStructureFillEnabled: { value: 0.0 },
+            uStructureFillColor: { value: new THREE.Color(structureFillSettings.color) },
+            uStructureFillStrength: { value: structureFillSettings.strength },
             uShapeMask: { value: dummyTex },
             uShapeBounds: { value: new THREE.Vector4(0,0,1,1) }
         };
@@ -533,6 +614,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             shader.uniforms.uEdgeProtection = liquidMaterial.userData.uEdgeProtection;
             shader.uniforms.uShapeReactivity = liquidMaterial.userData.uShapeReactivity;
             shader.uniforms.uBevelFlowMix = liquidMaterial.userData.uBevelFlowMix;
+            shader.uniforms.uStructureFillEnabled = liquidMaterial.userData.uStructureFillEnabled;
+            shader.uniforms.uStructureFillColor = liquidMaterial.userData.uStructureFillColor;
+            shader.uniforms.uStructureFillStrength = liquidMaterial.userData.uStructureFillStrength;
             shader.uniforms.uShapeMask = liquidMaterial.userData.uShapeMask;
             shader.uniforms.uShapeBounds = liquidMaterial.userData.uShapeBounds;
 
@@ -560,6 +644,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
                 uniform float uEdgeProtection;
                 uniform float uShapeReactivity;
                 uniform float uBevelFlowMix;
+                uniform float uStructureFillEnabled;
+                uniform vec3 uStructureFillColor;
+                uniform float uStructureFillStrength;
                 
                 uniform sampler2D uShapeMask;
                 uniform vec4 uShapeBounds;
@@ -638,6 +725,17 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             shader.fragmentShader = shader.fragmentShader.replace(
                 /texture2D\(\s*iridescenceThicknessMap\s*,\s*vIridescenceThicknessMapUv\s*\)/g,
                 'vec4(vFluidNoise * 0.5 + 0.5)' 
+            );
+
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <opaque_fragment>',
+                `
+                float structureFillMask = clamp(uStructureFillEnabled, 0.0, 1.0);
+                float structureDarkness = 1.0 - max(max(outgoingLight.r, outgoingLight.g), outgoingLight.b);
+                vec3 structureFill = uStructureFillColor * structureDarkness * uStructureFillStrength;
+                outgoingLight = mix(outgoingLight, max(outgoingLight, structureFill), structureFillMask);
+                #include <opaque_fragment>
+                `
             );
         };
 
@@ -881,6 +979,11 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             gradePass.uniforms.uExposure.value = chromaticSettings.whiteExposure;
         }
 
+        function applyEdgeSmoothState() {
+            edgeSmoothPass.enabled = edgeSmoothSettings.enabled;
+            edgeSmoothPass.uniforms.uStrength.value = edgeSmoothSettings.strength;
+        }
+
         function applyGradientMapState() {
             const orderedStops = [...gradientMapSettings.stops]
                 .sort((a, b) => a.position - b.position)
@@ -974,7 +1077,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             gradientMapSettings.stops.forEach((stop) => {
                 const row = document.createElement('div');
                 row.className = 'gradient-stop-row';
-                row.draggable = true;
+                row.draggable = false;
                 row.dataset.stopId = stop.id;
                 row.innerHTML = `
                     <span class="gradient-stop-handle" title="Arrastrar prioridad">::</span>
@@ -985,13 +1088,17 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
                     <button class="gradient-stop-remove" type="button" title="Eliminar color">x</button>
                 `;
 
-                row.addEventListener('dragstart', (event) => {
+                const handle = row.querySelector('.gradient-stop-handle');
+                handle.draggable = true;
+
+                handle.addEventListener('dragstart', (event) => {
+                    event.stopPropagation();
                     event.dataTransfer.setData('text/plain', stop.id);
                     event.dataTransfer.effectAllowed = 'move';
                     row.classList.add('is-dragging');
                 });
 
-                row.addEventListener('dragend', () => {
+                handle.addEventListener('dragend', () => {
                     row.classList.remove('is-dragging');
                 });
 
@@ -1049,6 +1156,12 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             liquidMaterial.needsUpdate = true;
         }
 
+        function applyStructureFillState() {
+            liquidMaterial.userData.uStructureFillEnabled.value = structureFillSettings.enabled ? 1.0 : 0.0;
+            liquidMaterial.userData.uStructureFillColor.value.set(structureFillSettings.color);
+            liquidMaterial.userData.uStructureFillStrength.value = structureFillSettings.strength;
+        }
+
         function applyChromeLevel() {
             const chromeBoost = chromaticSettings.chromeLevel;
             liquidMaterial.metalness = Math.min(1, baseMaterialSnapshot.metalness + chromeBoost * 0.22);
@@ -1079,6 +1192,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
                 },
                 glow: { enabled: true, strength: 0.14, radius: 0.16, threshold: 0.32 },
                 chromatic: { enabled: true, intensity: 0.0021, angle: 1.48, chromeLevel: 0.0, contrast: 1.0, whiteExposure: 1.0, preset: 'balanced' },
+                structureFill: { enabled: false, color: '#cfd2d4', strength: 0.75 },
                 geometry: { depth: 100.0, bevelSize: 2.5, bevelThickness: 2.5, bevelSegments: 96 },
                 bevel: { enableBevelDynamics: false, bevelFlowInfluence: 1.0 },
                 environment: { enabled: false, affectLogo: false, affectBackground: false, envIntensity: 1.35 }
@@ -1140,6 +1254,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             Object.assign(glassSettings, preset.glass);
             Object.assign(glowSettings, preset.glow);
             Object.assign(chromaticSettings, preset.chromatic);
+            Object.assign(structureFillSettings, preset.structureFill || { enabled: false, color: '#cfd2d4', strength: 0.75 });
             Object.assign(bevelSettings, preset.bevel);
             Object.assign(environmentTextureSettings, preset.environment);
 
@@ -1152,6 +1267,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             updateBaseMaterialSnapshotFromCurrent();
             applyChromeLevel();
             applyGlassState();
+            applyStructureFillState();
             applyGlowState();
             applyChromaticState();
             applyEnvironmentTextureState();
@@ -1310,6 +1426,17 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         materialFolder.add(liquidMaterial, 'metalness', 0.0, 1.0).name('Metalness');
         materialFolder.add(liquidMaterial, 'clearcoat', 0.0, 1.0).name('Clearcoat');
 
+        const structureFillFolder = gui.addFolder('Full Structure Color');
+        structureFillFolder.add(structureFillSettings, 'enabled').name('Enable Full Color').onChange(() => {
+            applyStructureFillState();
+        });
+        structureFillFolder.addColor(structureFillSettings, 'color').name('Structure Color').onChange(() => {
+            applyStructureFillState();
+        });
+        structureFillFolder.add(structureFillSettings, 'strength', 0.0, 1.5, 0.01).name('Fill Strength').onChange(() => {
+            applyStructureFillState();
+        });
+
         const glassFolder = gui.addFolder('Glass Texture');
         glassFolder.add(glassSettings, 'enabled').name('Enable Glass').onChange(() => {
             applyGlassState();
@@ -1376,6 +1503,14 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         });
         chromaticFolder.add(chromaticSettings, 'preset', ['subtle', 'balanced', 'prism', 'glitch']).name('Variation').onChange(v => {
             applyChromaticPreset(v);
+        });
+
+        const edgeSmoothFolder = gui.addFolder('Edge Smoothing');
+        edgeSmoothFolder.add(edgeSmoothSettings, 'enabled').name('Enable Smoothing').onChange(() => {
+            applyEdgeSmoothState();
+        });
+        edgeSmoothFolder.add(edgeSmoothSettings, 'strength', 0.0, 1.0, 0.01).name('Smoothing Strength').onChange(() => {
+            applyEdgeSmoothState();
         });
 
         const gradientMapFolder = gui.addFolder('Gradient Map');
@@ -1590,16 +1725,18 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             { id: 'fluid', index: '02', title: 'Dinamica Fluida', meta: 'Simulacion / Fluido', description: 'Define la vibracion liquida del metal, cuanto se desplaza la materia sobre la forma y que tan nitidos se mantienen sus bordes.', categories: ['all', 'fluido'], folder: effectFolder },
             { id: 'iridescence', index: '03', title: 'Iridescencia', meta: 'Color / Refraccion', description: 'Anade el desvio cromatico interno del material y regula el espesor que determina como aparecen esos matices en la superficie.', categories: ['all', 'material', 'color'], folder: iridescenceFolder },
             { id: 'material', index: '04', title: 'Material Base', meta: 'Metal / Superficie', description: 'Ajusta el cuerpo principal del logo: rugosidad, nivel metalico y la capa de brillo superior que define su pulido general.', categories: ['all', 'material'], folder: materialFolder },
-            { id: 'glass', index: '05', title: 'Textura Glass', meta: 'Refraccion / Vidrio', description: 'Modifica la transparencia, la refraccion y el tinte interno para llevar el logo hacia un look de vidrio o cristal liquido.', categories: ['all', 'material', 'visual'], folder: glassFolder },
-            { id: 'glow', index: '06', title: 'Glow', meta: 'Luz / Halo', description: 'Controla el halo alrededor del logo para sumar presencia sin romper la limpieza del diseno. Ideal para dar volumen sutil.', categories: ['all', 'luz', 'post'], folder: glowFolder },
-            { id: 'chromatic', index: '07', title: 'Cromatico', meta: 'Postproceso / Chrome', description: 'Define la separacion cromatica, el contraste y la exposicion blanca del render para darle un acabado mas editorial o mas agresivo.', categories: ['all', 'post', 'color'], folder: chromaticFolder },
-            { id: 'gradient-map', index: '08', title: 'Gradient Map', meta: 'Color / Mapa Tonal', description: 'Aplica un mapa de degradado al render completo, como en Photoshop: las sombras toman un color y las luces otro, mezclandose segun la luminancia.', categories: ['all', 'post', 'color'], folder: gradientMapFolder },
-            { id: 'geometry', index: '09', title: 'Geometria', meta: 'Extrusion / Forma', description: 'Aqui decides el volumen real del logo: profundidad, bisel y la lectura general de la pieza en el espacio.', categories: ['all', 'geometria'], folder: geometryFolder },
-            { id: 'bevel', index: '10', title: 'Dinamica de Bisel', meta: 'Geometria / Flujo', description: 'Redirige el comportamiento del fluido hacia el bisel para que la materia siga el contorno de la forma con mas intencion.', categories: ['all', 'geometria', 'fluido'], folder: bevelFolder },
-            { id: 'environment', index: '11', title: 'Entorno', meta: 'Iluminacion / Textura', description: 'Permite cargar una textura de entorno para alterar reflejos, iluminacion y, si quieres, la lectura del propio material del logo.', categories: ['all', 'entorno', 'visual'], folder: environmentFolder },
-            { id: 'export-360', index: '12', title: 'Export 360', meta: 'Video / Rotacion', description: 'Exporta una vuelta completa de 360 grados del logo sobre su eje vertical. El navegador intentara descargar MP4 y usara WebM si MP4 no esta disponible.', categories: ['all', 'archivo'], folder: export360Folder },
-            { id: 'community-presets', index: '13', title: "Preset's Comunidad", meta: 'Disenadores / Looks', description: 'Guarda y aplica presets creados por la comunidad. Deushima v1 conserva el look anterior para volver a el cuando quieras.', categories: ['all', 'presets', 'material', 'post'], folder: communityFolder },
-            { id: 'files', index: '14', title: 'Archivos', meta: 'Importacion / Exportacion', description: 'Gestiona el SVG, la carga de nuevos assets y la exportacion final en PNG con fondo o transparente, sin incluir la esfera ambiental.', categories: ['all', 'archivo'], folder: fileFolder }
+            { id: 'structure-fill', index: '05', title: 'Estructura Completa', meta: 'Color / Relleno', description: 'Rellena las zonas oscuras de la estructura con un color editable. Por defecto usa plateado para que laterales y parte trasera no queden negros.', categories: ['all', 'material', 'visual', 'color'], folder: structureFillFolder },
+            { id: 'glass', index: '06', title: 'Textura Glass', meta: 'Refraccion / Vidrio', description: 'Modifica la transparencia, la refraccion y el tinte interno para llevar el logo hacia un look de vidrio o cristal liquido.', categories: ['all', 'material', 'visual'], folder: glassFolder },
+            { id: 'glow', index: '07', title: 'Glow', meta: 'Luz / Halo', description: 'Controla el halo alrededor del logo para sumar presencia sin romper la limpieza del diseno. Ideal para dar volumen sutil.', categories: ['all', 'luz', 'post'], folder: glowFolder },
+            { id: 'chromatic', index: '08', title: 'Cromatico', meta: 'Postproceso / Chrome', description: 'Define la separacion cromatica, el contraste y la exposicion blanca del render para darle un acabado mas editorial o mas agresivo.', categories: ['all', 'post', 'color'], folder: chromaticFolder },
+            { id: 'edge-smoothing', index: '09', title: 'Suavizar Bordes', meta: 'Postproceso / Anti Alias', description: 'Activa un suavizado final sobre el render para reducir bordes pixelados sin cambiar la forma ni el material del logo.', categories: ['all', 'post', 'visual'], folder: edgeSmoothFolder },
+            { id: 'gradient-map', index: '10', title: 'Gradient Map', meta: 'Color / Mapa Tonal', description: 'Aplica un mapa de degradado al render completo, como en Photoshop: las sombras toman un color y las luces otro, mezclandose segun la luminancia.', categories: ['all', 'post', 'color'], folder: gradientMapFolder },
+            { id: 'geometry', index: '11', title: 'Geometria', meta: 'Extrusion / Forma', description: 'Aqui decides el volumen real del logo: profundidad, bisel y la lectura general de la pieza en el espacio.', categories: ['all', 'geometria'], folder: geometryFolder },
+            { id: 'bevel', index: '12', title: 'Dinamica de Bisel', meta: 'Geometria / Flujo', description: 'Redirige el comportamiento del fluido hacia el bisel para que la materia siga el contorno de la forma con mas intencion.', categories: ['all', 'geometria', 'fluido'], folder: bevelFolder },
+            { id: 'environment', index: '13', title: 'Entorno', meta: 'Iluminacion / Textura', description: 'Permite cargar una textura de entorno para alterar reflejos, iluminacion y, si quieres, la lectura del propio material del logo.', categories: ['all', 'entorno', 'visual'], folder: environmentFolder },
+            { id: 'export-360', index: '14', title: 'Export 360', meta: 'Video / Rotacion', description: 'Exporta una vuelta completa de 360 grados del logo sobre su eje vertical. El navegador intentara descargar MP4 y usara WebM si MP4 no esta disponible.', categories: ['all', 'archivo'], folder: export360Folder },
+            { id: 'community-presets', index: '15', title: "Preset's Comunidad", meta: 'Disenadores / Looks', description: 'Guarda y aplica presets creados por la comunidad. Deushima v1 conserva el look anterior para volver a el cuando quieras.', categories: ['all', 'presets', 'material', 'post'], folder: communityFolder },
+            { id: 'files', index: '16', title: 'Archivos', meta: 'Importacion / Exportacion', description: 'Gestiona el SVG, la carga de nuevos assets y la exportacion final en PNG con fondo o transparente, sin incluir la esfera ambiental.', categories: ['all', 'archivo'], folder: fileFolder }
         ];
 
         const hudFilterCatalog = [
@@ -1772,8 +1909,10 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 
         applyChromeLevel();
         applyGlassState();
+        applyStructureFillState();
         applyGlowState();
         applyChromaticState();
+        applyEdgeSmoothState();
         applyGradientMapState();
         applyEnvironmentTextureState();
 
@@ -1823,6 +1962,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             composer.setPixelRatio(pixelRatio);
             bloomPass.setSize(width, height);
             pixelScanPass.uniforms.uResolution.value.set(width, height);
+            edgeSmoothPass.uniforms.resolution.value.set(1 / (width * pixelRatio), 1 / (height * pixelRatio));
         }
 
         window.addEventListener('resize', resizeWorkbench);

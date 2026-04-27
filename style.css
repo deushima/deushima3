@@ -643,6 +643,10 @@ body > .site-footer {
     cursor: grab;
 }
 
+.gradient-stop-handle:active {
+    cursor: grabbing;
+}
+
 .gradient-stop-label,
 .gradient-stop-color,
 .gradient-stop-position {
