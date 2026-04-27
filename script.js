@@ -30,6 +30,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 
         document.title = 'Deushima Liquid Metal Workspace';
         document.querySelectorAll('body > .sound-embed, body > .site-footer').forEach((node) => node.remove());
+        document.querySelectorAll('.cursor-follower').forEach((node) => node.remove());
 
         if (hudBrandLogo) {
             hudBrandLogo.innerHTML = INLINE_INITIAL_SVG || `<img src="${INITIAL_SVG_URL}" alt="Deushima">`;
@@ -39,6 +40,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             width: Math.max(workbenchViewport?.clientWidth || window.innerWidth, 1),
             height: Math.max(workbenchViewport?.clientHeight || window.innerHeight, 1)
         });
+        const compositionSettings = {
+            verticalOffset: 3.4
+        };
 
         // --- GLSL NOISE FUNCTION ---
         const simplex3D = `
@@ -672,8 +676,12 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             const scaledBox = new THREE.Box3().setFromObject(svgGroup);
             const finalCenter = scaledBox.getCenter(new THREE.Vector3());
             
-            // 3. Move group into absolute center of the camera view
+            // 3. Move group into absolute center of the camera view and lift it slightly
+            // so the composition feels visually centered within the workbench.
             svgGroup.position.sub(finalCenter);
+            svgGroup.position.y += compositionSettings.verticalOffset;
+            controls.target.set(0, compositionSettings.verticalOffset, 0);
+            controls.update();
         }
 
         function loadSVGFromString(svgText) {
@@ -1199,43 +1207,5 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             resizeObserver.observe(workbenchViewport);
         }
         resizeWorkbench();
-
-        // --- CURSOR FOLLOWER ---
-        if (window.matchMedia('(pointer: fine)').matches) {
-            const followerEl = document.createElement('div');
-            followerEl.className = 'cursor-follower';
-            document.body.appendChild(followerEl);
-
-            const pointer = { x: window.innerWidth * 0.5, y: window.innerHeight * 0.5 };
-            const follower = { x: pointer.x, y: pointer.y };
-
-            const setXY = (el, x, y, scale = 1) => {
-                el.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
-            };
-
-            window.addEventListener('pointermove', (event) => {
-                pointer.x = event.clientX;
-                pointer.y = event.clientY;
-                followerEl.style.opacity = '0.7';
-            });
-
-            window.addEventListener('pointerleave', () => {
-                followerEl.style.opacity = '0';
-            });
-
-            window.addEventListener('pointerenter', () => {
-                followerEl.style.opacity = '0.7';
-            });
-
-            function animateCursor() {
-                follower.x += (pointer.x - follower.x) * 0.055;
-                follower.y += (pointer.y - follower.y) * 0.055;
-                setXY(followerEl, follower.x, follower.y, 1);
-
-                requestAnimationFrame(animateCursor);
-            }
-
-            animateCursor();
-        }
 
         animate();

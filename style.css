@@ -33,9 +33,7 @@ body {
 body {
     margin: 0;
     overflow: hidden;
-    background:
-        radial-gradient(circle at top left, rgba(255, 255, 255, 0.04), transparent 26%),
-        linear-gradient(180deg, #101010 0%, #090909 100%);
+    background: #0b0b0b;
     color: var(--text);
     font-family: "Space Grotesk", sans-serif;
     cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 20 20'%3E%3Cpath fill='%23000' d='M2.8 2.6l4.6 11 1.8-3.8 4 3.2 1.2-1.5-4-3.1 4.1-1.4z'/%3E%3Cpath fill='none' stroke='%23fff' stroke-width='0.9' d='M2.8 2.6l4.6 11 1.8-3.8 4 3.2 1.2-1.5-4-3.1 4.1-1.4z'/%3E%3C/svg%3E") 2 2, auto;
@@ -43,6 +41,10 @@ body {
 
 body > .sound-embed,
 body > .site-footer {
+    display: none !important;
+}
+
+.cursor-follower {
     display: none !important;
 }
 
@@ -64,18 +66,21 @@ body > .site-footer {
     position: relative;
     display: grid;
     grid-template-rows: auto auto minmax(0, 1fr) auto;
+    height: 100vh;
+    min-height: 0;
     min-width: 0;
+    overflow: hidden;
     border-right: 1px solid var(--border);
     background: linear-gradient(180deg, rgba(22, 22, 22, 0.98) 0%, rgba(16, 16, 16, 0.98) 100%);
 }
 
 .hud-sidebar__brand {
-    padding: 34px 32px 24px;
+    padding: 26px 30px 20px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .hud-brand__logo {
-    width: 256px;
+    width: 238px;
     max-width: 100%;
     filter: invert(1);
     opacity: 0.98;
@@ -92,7 +97,7 @@ body > .site-footer {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    padding: 18px 20px 18px 20px;
+    padding: 16px 20px 14px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 
@@ -115,14 +120,28 @@ body > .site-footer {
 }
 
 .hud-sidebar__tools {
-    overflow: auto;
-    padding-bottom: 18px;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: scroll;
+    padding-bottom: 12px;
+    scrollbar-gutter: stable;
+    overscroll-behavior: contain;
+    background:
+        linear-gradient(rgba(18, 18, 18, 0.96), rgba(18, 18, 18, 0)) top / 100% 18px no-repeat,
+        linear-gradient(rgba(18, 18, 18, 0), rgba(18, 18, 18, 0.96)) bottom / 100% 22px no-repeat,
+        linear-gradient(180deg, rgba(18, 18, 18, 0.4), rgba(18, 18, 18, 0.4));
 }
 
 .hud-sidebar__tools::-webkit-scrollbar,
 .controls-drawer__body::-webkit-scrollbar,
 .lil-gui.root::-webkit-scrollbar {
-    width: 8px;
+    width: 10px;
+}
+
+.hud-sidebar__tools::-webkit-scrollbar-track,
+.controls-drawer__body::-webkit-scrollbar-track,
+.lil-gui.root::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.03);
 }
 
 .hud-sidebar__tools::-webkit-scrollbar-thumb,
@@ -134,16 +153,16 @@ body > .site-footer {
 .tool-card {
     position: relative;
     display: grid;
-    grid-template-columns: 54px minmax(0, 1fr) 22px;
+    grid-template-columns: 48px minmax(0, 1fr) 20px;
     align-items: center;
-    gap: 20px;
+    gap: 16px;
     width: 100%;
     border: 0;
     border-top: 1px solid rgba(255, 255, 255, 0.07);
     background: transparent;
     color: inherit;
     text-align: left;
-    padding: 22px 22px 24px 20px;
+    padding: 17px 18px 18px 20px;
     transition: background 180ms ease, border-color 180ms ease;
 }
 
@@ -166,7 +185,7 @@ body > .site-footer {
 .tool-card__title {
     margin: 0 0 6px;
     color: var(--text);
-    font-size: 20px;
+    font-size: 19px;
     font-weight: 700;
     line-height: 1;
 }
@@ -174,7 +193,7 @@ body > .site-footer {
 .tool-card__meta {
     margin: 0;
     color: var(--text-faint);
-    font: 500 11px/1.45 "IBM Plex Mono", monospace;
+    font: 500 10px/1.35 "IBM Plex Mono", monospace;
     letter-spacing: 0.14em;
     text-transform: uppercase;
 }
@@ -191,9 +210,10 @@ body > .site-footer {
 
 .hud-sidebar__footer {
     display: grid;
-    gap: 18px;
-    padding: 24px 22px 22px;
+    gap: 12px;
+    padding: 14px 20px 16px;
     border-top: 1px solid rgba(255, 255, 255, 0.07);
+    background: linear-gradient(180deg, rgba(16, 16, 16, 0.94), rgba(18, 18, 18, 0.98));
 }
 
 .hud-footer__meta {
@@ -204,8 +224,8 @@ body > .site-footer {
 .hud-footer__meta p {
     margin: 0;
     color: var(--text-soft);
-    font-size: 13px;
-    line-height: 1.5;
+    font-size: 11px;
+    line-height: 1.35;
 }
 
 .hud-footer__links {
@@ -427,26 +447,6 @@ body > .site-footer {
     letter-spacing: 0.18em;
 }
 
-.cursor-follower {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 320px;
-    height: 320px;
-    margin-left: -160px;
-    margin-top: -160px;
-    border-radius: 999px;
-    background:
-        radial-gradient(circle at 34% 30%, rgba(255, 255, 255, 0.46) 0%, rgba(214, 214, 220, 0.32) 16%, rgba(136, 136, 144, 0.22) 34%, rgba(78, 78, 84, 0.14) 52%, rgba(20, 20, 24, 0.05) 68%, rgba(0, 0, 0, 0) 78%),
-        radial-gradient(circle at 62% 68%, rgba(36, 36, 40, 0.18) 0%, rgba(0, 0, 0, 0) 42%);
-    pointer-events: none;
-    transform: translate3d(-100px, -100px, 0) scale(1);
-    opacity: 0.62;
-    filter: blur(54px);
-    z-index: 0;
-    transition: opacity 180ms ease, transform 220ms ease;
-}
-
 .lil-gui,
 .lil-gui *,
 .hud-footer__links a,
@@ -637,11 +637,5 @@ body > .site-footer {
 
     .controls-drawer__body {
         max-height: 48vh;
-    }
-}
-
-@media (pointer: coarse) {
-    .cursor-follower {
-        display: none;
     }
 }
