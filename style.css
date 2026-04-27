@@ -1,317 +1,647 @@
-body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background:
-                radial-gradient(circle at top, rgba(46, 84, 255, 0.14), transparent 34%),
-                linear-gradient(180deg, #090312 0%, #06020d 100%);
-            background-color: #06020d; 
-            font-family: sans-serif;
-            cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Cpath fill='%23000' stroke='%23fff' stroke-width='0.9' d='M3 2.5l5.6 13.2 2.1-4.5 4.6 3.7 1.5-1.9-4.6-3.6 4.8-1.6z'/%3E%3C/svg%3E") 3 2, auto;
-        }
-        #fileInput {
-            display: none;
-        }
-        #textureInput {
-            display: none;
-        }
-        .cursor-follower {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 320px;
-            height: 320px;
-            margin-left: -160px;
-            margin-top: -160px;
-            border-radius: 999px;
-            background:
-                radial-gradient(circle at 34% 30%, rgba(255, 255, 255, 0.46) 0%, rgba(214, 214, 220, 0.32) 16%, rgba(136, 136, 144, 0.22) 34%, rgba(78, 78, 84, 0.14) 52%, rgba(20, 20, 24, 0.05) 68%, rgba(0, 0, 0, 0) 78%),
-                radial-gradient(circle at 62% 68%, rgba(36, 36, 40, 0.18) 0%, rgba(0, 0, 0, 0) 42%);
-            pointer-events: none;
-            transform: translate3d(-100px, -100px, 0) scale(1);
-            opacity: 0.62;
-            filter: blur(54px);
-            z-index: 0;
-            transition: opacity 180ms ease, transform 220ms ease;
-        }
-        .lil-gui {
-            --background-color: rgba(18, 18, 20, 0.58);
-            --widget-color: rgba(36, 36, 40, 0.48);
-            --hover-color: rgba(104, 104, 112, 0.24);
-            --focus-color: rgba(188, 188, 194, 0.22);
-            --text-color: rgba(241, 241, 244, 0.94);
-            --title-background-color: rgba(255, 255, 255, 0.05);
-            --title-text-color: rgba(248, 248, 250, 0.98);
-            --number-color: #cfcfd6;
-            --string-color: #e6e6ea;
-            position: fixed;
-            top: 14px;
-            right: 14px;
-            width: 290px;
-            max-width: calc(100vw - 28px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 24px;
-            background:
-                linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(138, 138, 144, 0.08) 24%, rgba(18, 18, 22, 0.62) 62%, rgba(8, 8, 10, 0.78) 100%);
-            box-shadow:
-                0 0 0 1px rgba(255, 255, 255, 0.04) inset,
-                0 18px 48px rgba(0, 0, 0, 0.34),
-                0 0 24px rgba(255, 255, 255, 0.04);
-            backdrop-filter: blur(18px) saturate(145%);
-            -webkit-backdrop-filter: blur(18px) saturate(145%);
-            overflow: hidden;
-        }
-        .lil-gui::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-            background:
-                linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent 24%),
-                radial-gradient(circle at 18% 10%, rgba(255, 255, 255, 0.24), transparent 24%),
-                radial-gradient(circle at 35% 12%, rgba(255, 255, 255, 0.08), transparent 28%);
-            opacity: 0.9;
-        }
-        .lil-gui.root {
-            max-height: calc(100vh - 28px);
-        }
-        .lil-gui .title {
-            border-radius: 999px;
-            margin: 8px 10px;
-            border: 1px solid rgba(255, 255, 255, 0.09);
-            background:
-                linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0%, rgba(162, 162, 168, 0.12) 28%, rgba(20, 20, 24, 0.42) 100%);
-            box-shadow:
-                inset 0 1px 0 rgba(255, 255, 255, 0.14),
-                0 6px 18px rgba(0, 0, 0, 0.18);
-            letter-spacing: 0.03em;
-        }
-        .lil-gui .children {
-            border-left: 0;
-        }
-        .lil-gui .controller {
-            margin: 6px 8px;
-            padding: 2px 0;
-            border-radius: 18px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            background: rgba(255, 255, 255, 0.02);
-        }
-        .lil-gui .controller.option,
-        .lil-gui .controller.function,
-        .lil-gui .controller.color {
-            background: rgba(255, 255, 255, 0.03);
-        }
-        .lil-gui .name {
-            padding-left: 12px;
-            font-size: 11px;
-            letter-spacing: 0.02em;
-            color: rgba(235, 235, 239, 0.9);
-        }
-        .lil-gui input,
-        .lil-gui button,
-        .lil-gui select {
-            border-radius: 999px !important;
-        }
-        .lil-gui .widget {
-            border-radius: 999px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            background:
-                linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(34, 34, 40, 0.42));
-            box-shadow:
-                inset 0 1px 0 rgba(255, 255, 255, 0.08),
-                0 1px 8px rgba(0, 0, 0, 0.12);
-        }
-        .lil-gui .slider {
-            height: 20px;
-            border-radius: 999px;
-            background:
-                linear-gradient(90deg, rgba(248, 248, 250, 0.1) 0%, rgba(160, 160, 168, 0.14) 24%, rgba(16, 16, 19, 0.78) 100%);
-            box-shadow:
-                inset 0 1px 0 rgba(255, 255, 255, 0.08),
-                inset 0 0 0 1px rgba(255, 255, 255, 0.05);
-        }
-        .lil-gui .slider-fg {
-            border-radius: 999px;
-            background:
-                linear-gradient(90deg, rgba(248, 248, 250, 0.96) 0%, rgba(206, 206, 214, 0.92) 45%, rgba(148, 148, 156, 0.84) 100%);
-            box-shadow:
-                0 0 10px rgba(255, 255, 255, 0.12),
-                inset 0 1px 0 rgba(255, 255, 255, 0.26);
-        }
-        .lil-gui input[type="text"],
-        .lil-gui input[type="number"] {
-            background: rgba(14, 14, 17, 0.5);
-            color: #ececf1;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-        }
-        .lil-gui button {
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            background:
-                linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0%, rgba(170, 170, 176, 0.12) 34%, rgba(24, 24, 28, 0.74) 100%);
-            color: rgba(242, 242, 246, 0.96);
-            box-shadow:
-                inset 0 1px 0 rgba(255, 255, 255, 0.08),
-                0 8px 18px rgba(0, 0, 0, 0.18);
-        }
-        .lil-gui button:hover {
-            background:
-                linear-gradient(90deg, rgba(255, 255, 255, 0.16) 0%, rgba(186, 186, 192, 0.18) 38%, rgba(30, 30, 34, 0.8) 100%);
-        }
-        .sound-embed {
-            position: fixed;
-            left: 18px;
-            bottom: 18px;
-            z-index: 20;
-            width: min(320px, calc(100vw - 36px));
-            padding: 10px 12px;
-            border-radius: 16px;
-            background: rgba(12, 12, 14, 0.34);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
-            opacity: 0.72;
-            transition: opacity 180ms ease, transform 180ms ease, background 180ms ease;
-        }
-        .sound-embed:hover {
-            opacity: 0.94;
-            transform: translateY(-2px);
-            background: rgba(12, 12, 14, 0.46);
-        }
-        .sound-embed .elfsight-app-8d2a3da6-87d4-4e38-87bd-a303b034e273 {
-            transform: scale(0.94);
-            transform-origin: left bottom;
-        }
-        .site-footer {
-            position: fixed;
-            right: 18px;
-            bottom: 18px;
-            z-index: 20;
-            display: flex;
-            align-items: flex-end;
-            gap: 14px;
-            max-width: min(480px, calc(100vw - 36px));
-            padding: 12px 14px;
-            border-radius: 18px;
-            background: rgba(10, 10, 12, 0.28);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
-            color: rgba(255, 255, 255, 0.78);
-        }
-        .site-footer__meta {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        .site-footer__meta p {
-            margin: 0;
-            font-size: 11px;
-            line-height: 1.45;
-            letter-spacing: 0.04em;
-        }
-        .site-footer__links {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .site-footer__links a {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 34px;
-            height: 34px;
-            border: 1px solid rgba(255, 255, 255, 0.14);
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.025);
-            color: rgba(255, 255, 255, 0.86);
-            transition: transform 180ms ease, background 180ms ease, border-color 180ms ease, color 180ms ease;
-        }
-        .site-footer__links a:hover {
-            transform: translateY(-1px);
-            background: rgba(255, 255, 255, 0.1);
-            border-color: rgba(255, 255, 255, 0.28);
-            color: #ffffff;
-        }
-        .site-footer__links svg {
-            width: 16px;
-            height: 16px;
-            fill: currentColor;
-        }
-        .lil-gui,
-        .lil-gui *,
-        .site-footer,
-        .site-footer *,
-        .sound-embed,
-        .sound-embed * {
-            cursor: auto !important;
-        }
-        @media (max-width: 640px) {
-            .lil-gui {
-                top: 10px;
-                right: 10px;
-                width: min(290px, calc(100vw - 20px));
-                border-radius: 20px;
-            }
-            .sound-embed {
-                left: 12px;
-                right: 12px;
-                bottom: 12px;
-                width: auto;
-                padding: 8px 10px;
-                opacity: 0.82;
-            }
-            .site-footer {
-                left: 12px;
-                right: 12px;
-                bottom: 94px;
-                max-width: none;
-                padding: 10px 12px;
-                gap: 12px;
-            }
-            .site-footer__meta p {
-                font-size: 10px;
-            }
-        }
-        @media (pointer: coarse) {
-            .cursor-follower {
-                display: none;
-            }
-        }
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap");
 
-        /* Stable overrides for lil-gui layout */
-        .lil-gui:not(.root) {
-            position: static;
-            width: 100%;
-            max-width: none;
-            border: 0;
-            border-radius: 0;
-            background: transparent;
-            box-shadow: none;
-            backdrop-filter: none;
-            -webkit-backdrop-filter: none;
-            overflow: visible;
-        }
-        .lil-gui:not(.root)::before {
-            content: none;
-        }
-        .lil-gui.root {
-            overflow-y: auto;
-            overflow-x: hidden;
-        }
-        .lil-gui.root > .title {
-            margin: 10px 10px 6px;
-        }
-        .lil-gui .folder > .title {
-            margin: 0;
-            border-radius: 14px;
-            border: 0;
-            background: rgba(255, 255, 255, 0.04);
-            box-shadow: none;
-        }
-        .lil-gui .children > .controller:first-child {
-            margin-top: 4px;
-        }
-        .lil-gui .children > .controller:last-child {
-            margin-bottom: 6px;
-        }
+:root {
+    --bg: #0b0b0b;
+    --panel: #121212;
+    --panel-soft: #171717;
+    --panel-strong: #0f0f0f;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.14);
+    --text: rgba(246, 246, 246, 0.94);
+    --text-soft: rgba(246, 246, 246, 0.58);
+    --text-faint: rgba(246, 246, 246, 0.34);
+    --chip: #1a1a1a;
+    --chip-active: #f3f3f3;
+    --chip-active-text: #111111;
+    --sidebar-width: 386px;
+    --info-height: 124px;
+    --radius: 26px;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+}
+
+body {
+    margin: 0;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.04), transparent 26%),
+        linear-gradient(180deg, #101010 0%, #090909 100%);
+    color: var(--text);
+    font-family: "Space Grotesk", sans-serif;
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 20 20'%3E%3Cpath fill='%23000' d='M2.8 2.6l4.6 11 1.8-3.8 4 3.2 1.2-1.5-4-3.1 4.1-1.4z'/%3E%3Cpath fill='none' stroke='%23fff' stroke-width='0.9' d='M2.8 2.6l4.6 11 1.8-3.8 4 3.2 1.2-1.5-4-3.1 4.1-1.4z'/%3E%3C/svg%3E") 2 2, auto;
+}
+
+body > .sound-embed,
+body > .site-footer {
+    display: none !important;
+}
+
+#fileInput,
+#textureInput {
+    display: none;
+}
+
+.app-shell {
+    position: relative;
+    display: grid;
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+    width: 100vw;
+    height: 100vh;
+    background: rgba(10, 10, 10, 0.96);
+}
+
+.hud-sidebar {
+    position: relative;
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    min-width: 0;
+    border-right: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(22, 22, 22, 0.98) 0%, rgba(16, 16, 16, 0.98) 100%);
+}
+
+.hud-sidebar__brand {
+    padding: 34px 32px 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.hud-brand__logo {
+    width: 256px;
+    max-width: 100%;
+    filter: invert(1);
+    opacity: 0.98;
+}
+
+.hud-brand__logo svg,
+.hud-brand__logo img {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.hud-sidebar__filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 18px 20px 18px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.tool-filter {
+    appearance: none;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--chip);
+    color: var(--text-soft);
+    padding: 7px 12px;
+    font: 500 11px/1 "IBM Plex Mono", monospace;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.tool-filter.is-active {
+    background: var(--chip-active);
+    border-color: rgba(255, 255, 255, 0.18);
+    color: var(--chip-active-text);
+}
+
+.hud-sidebar__tools {
+    overflow: auto;
+    padding-bottom: 18px;
+}
+
+.hud-sidebar__tools::-webkit-scrollbar,
+.controls-drawer__body::-webkit-scrollbar,
+.lil-gui.root::-webkit-scrollbar {
+    width: 8px;
+}
+
+.hud-sidebar__tools::-webkit-scrollbar-thumb,
+.controls-drawer__body::-webkit-scrollbar-thumb,
+.lil-gui.root::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.tool-card {
+    position: relative;
+    display: grid;
+    grid-template-columns: 54px minmax(0, 1fr) 22px;
+    align-items: center;
+    gap: 20px;
+    width: 100%;
+    border: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    padding: 22px 22px 24px 20px;
+    transition: background 180ms ease, border-color 180ms ease;
+}
+
+.tool-card:hover,
+.tool-card.is-active {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.tool-card__index {
+    align-self: start;
+    color: var(--text-faint);
+    font: 500 11px/1 "IBM Plex Mono", monospace;
+    letter-spacing: 0.18em;
+}
+
+.tool-card__content {
+    min-width: 0;
+}
+
+.tool-card__title {
+    margin: 0 0 6px;
+    color: var(--text);
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.tool-card__meta {
+    margin: 0;
+    color: var(--text-faint);
+    font: 500 11px/1.45 "IBM Plex Mono", monospace;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.tool-card__arrow {
+    color: var(--text-faint);
+    font-size: 16px;
+    text-align: right;
+}
+
+.tool-card[hidden] {
+    display: none;
+}
+
+.hud-sidebar__footer {
+    display: grid;
+    gap: 18px;
+    padding: 24px 22px 22px;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.hud-footer__meta {
+    display: grid;
+    gap: 6px;
+}
+
+.hud-footer__meta p {
+    margin: 0;
+    color: var(--text-soft);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.hud-footer__links {
+    display: flex;
+    gap: 10px;
+}
+
+.hud-footer__links a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.82);
+    background: rgba(255, 255, 255, 0.03);
+    transition: transform 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.hud-footer__links a:hover {
+    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+}
+
+.hud-footer__links svg {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+}
+
+.sound-embed {
+    width: 100%;
+    max-width: 100%;
+    padding: 8px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.sound-embed .elfsight-app-8d2a3da6-87d4-4e38-87bd-a303b034e273 {
+    transform: scale(0.9);
+    transform-origin: left center;
+}
+
+.hud-main {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) var(--info-height);
+    min-width: 0;
+}
+
+.workbench-frame {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    padding: 20px 20px 0 20px;
+}
+
+.workbench-frame__inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    border: 1px solid var(--border);
+    background: rgba(5, 5, 5, 0.98);
+    overflow: hidden;
+}
+
+.workbench-viewport {
+    position: absolute;
+    inset: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: #000000;
+    overflow: hidden;
+}
+
+.workbench-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.controls-drawer {
+    position: absolute;
+    top: 42px;
+    right: 42px;
+    z-index: 12;
+    width: min(340px, calc(100% - 84px));
+    pointer-events: none;
+}
+
+.controls-drawer__toggle {
+    pointer-events: auto;
+    position: absolute;
+    top: 0;
+    right: 0;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(14, 14, 14, 0.88);
+    color: rgba(255, 255, 255, 0.9);
+    padding: 11px 15px;
+    font: 500 11px/1 "IBM Plex Mono", monospace;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+}
+
+.controls-drawer__panel {
+    pointer-events: auto;
+    margin-top: 46px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background:
+        linear-gradient(180deg, rgba(17, 17, 17, 0.96) 0%, rgba(10, 10, 10, 0.95) 100%);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.controls-drawer.is-open .controls-drawer__panel {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.controls-drawer__header {
+    display: grid;
+    gap: 4px;
+    padding: 16px 18px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.controls-drawer__header p {
+    margin: 0;
+    color: var(--text-faint);
+    font: 500 10px/1 "IBM Plex Mono", monospace;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+}
+
+.controls-drawer__header h2 {
+    margin: 0;
+    font-size: 21px;
+    font-weight: 700;
+}
+
+.controls-drawer__body {
+    max-height: calc(100vh - 240px);
+    overflow: auto;
+    padding: 10px 10px 16px;
+}
+
+.hud-info {
+    display: grid;
+    grid-template-columns: 180px minmax(0, 1fr) 180px;
+    align-items: center;
+    gap: 24px;
+    padding: 0 26px;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(19, 19, 19, 0.96);
+}
+
+.hud-info__left {
+    display: grid;
+    gap: 6px;
+    justify-items: start;
+}
+
+.hud-info__left p,
+.hud-info__right span {
+    margin: 0;
+    color: var(--text-faint);
+    font: 500 10px/1 "IBM Plex Mono", monospace;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+}
+
+.hud-info__left span {
+    color: var(--text-soft);
+    font: 500 18px/1 "IBM Plex Mono", monospace;
+}
+
+.hud-info__center {
+    text-align: center;
+}
+
+.hud-info__center p {
+    margin: 0;
+}
+
+#toolInfoMeta {
+    color: var(--text-faint);
+    font: 500 11px/1.2 "IBM Plex Mono", monospace;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+}
+
+#toolInfoTitle {
+    margin: 10px 0 8px;
+    font-size: 24px;
+    line-height: 1;
+}
+
+#toolInfoDescription {
+    max-width: 720px;
+    margin: 0 auto;
+    color: var(--text-soft);
+    font-size: 15px;
+    line-height: 1.55;
+}
+
+.hud-info__right {
+    display: grid;
+    gap: 4px;
+    justify-items: end;
+}
+
+.hud-info__right strong {
+    color: rgba(255, 255, 255, 0.92);
+    font: 500 11px/1 "IBM Plex Mono", monospace;
+    letter-spacing: 0.18em;
+}
+
+.cursor-follower {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 320px;
+    height: 320px;
+    margin-left: -160px;
+    margin-top: -160px;
+    border-radius: 999px;
+    background:
+        radial-gradient(circle at 34% 30%, rgba(255, 255, 255, 0.46) 0%, rgba(214, 214, 220, 0.32) 16%, rgba(136, 136, 144, 0.22) 34%, rgba(78, 78, 84, 0.14) 52%, rgba(20, 20, 24, 0.05) 68%, rgba(0, 0, 0, 0) 78%),
+        radial-gradient(circle at 62% 68%, rgba(36, 36, 40, 0.18) 0%, rgba(0, 0, 0, 0) 42%);
+    pointer-events: none;
+    transform: translate3d(-100px, -100px, 0) scale(1);
+    opacity: 0.62;
+    filter: blur(54px);
+    z-index: 0;
+    transition: opacity 180ms ease, transform 220ms ease;
+}
+
+.lil-gui,
+.lil-gui *,
+.hud-footer__links a,
+.hud-footer__links a *,
+.sound-embed,
+.sound-embed * {
+    cursor: auto !important;
+}
+
+.controls-drawer__body > .lil-gui.root {
+    position: static;
+    width: 100%;
+    max-width: none;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    overflow: visible;
+    --background-color: transparent;
+    --widget-color: rgba(255, 255, 255, 0.06);
+    --hover-color: rgba(255, 255, 255, 0.1);
+    --focus-color: rgba(255, 255, 255, 0.08);
+    --text-color: rgba(255, 255, 255, 0.88);
+    --title-background-color: rgba(255, 255, 255, 0.04);
+    --title-text-color: rgba(255, 255, 255, 0.94);
+    --number-color: rgba(255, 255, 255, 0.88);
+    --string-color: rgba(255, 255, 255, 0.88);
+}
+
+.controls-drawer__body > .lil-gui.root::before,
+.controls-drawer__body > .lil-gui.root > .title {
+    display: none;
+}
+
+.controls-drawer__body .lil-gui .folder {
+    border-top: 0;
+}
+
+.controls-drawer__body .lil-gui .folder > .title {
+    margin: 0 0 10px;
+    padding: 12px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 18px;
+    font: 500 11px/1 "IBM Plex Mono", monospace;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+}
+
+.controls-drawer__body .lil-gui .children {
+    border-left: 0;
+}
+
+.controls-drawer__body .lil-gui .controller {
+    margin: 0 0 8px;
+    padding: 3px 0;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.controls-drawer__body .lil-gui .name {
+    padding-left: 12px;
+    font-size: 11px;
+    letter-spacing: 0.02em;
+}
+
+.controls-drawer__body .lil-gui .widget {
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.controls-drawer__body .lil-gui .slider {
+    height: 20px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.controls-drawer__body .lil-gui .slider-fg {
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.94) 0%, rgba(204, 204, 204, 0.82) 100%);
+}
+
+.controls-drawer__body .lil-gui input,
+.controls-drawer__body .lil-gui button,
+.controls-drawer__body .lil-gui select {
+    border-radius: 999px !important;
+}
+
+.controls-drawer__body .lil-gui input[type="text"],
+.controls-drawer__body .lil-gui input[type="number"],
+.controls-drawer__body .lil-gui select,
+.controls-drawer__body .lil-gui button {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.92);
+}
+
+@media (max-width: 1180px) {
+    :root {
+        --sidebar-width: 320px;
+        --info-height: 148px;
+    }
+
+    .tool-card__title {
+        font-size: 17px;
+    }
+
+    .controls-drawer {
+        top: 32px;
+        right: 32px;
+    }
+}
+
+@media (max-width: 920px) {
+    body {
+        overflow: auto;
+    }
+
+    .app-shell {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto minmax(0, 1fr);
+        height: auto;
+        min-height: 100vh;
+    }
+
+    .hud-sidebar {
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .hud-main {
+        grid-template-rows: minmax(70vh, auto) auto;
+    }
+
+    .hud-info {
+        grid-template-columns: 1fr;
+        text-align: center;
+        padding: 22px;
+    }
+
+    .hud-info__left,
+    .hud-info__right {
+        justify-items: center;
+    }
+
+    .controls-drawer {
+        width: min(340px, calc(100% - 56px));
+        top: 28px;
+        right: 28px;
+    }
+}
+
+@media (max-width: 640px) {
+    .hud-sidebar__brand {
+        padding: 24px 20px 18px;
+    }
+
+    .hud-sidebar__filters,
+    .hud-sidebar__footer {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .tool-card {
+        grid-template-columns: 40px minmax(0, 1fr) 18px;
+        gap: 14px;
+        padding: 18px 16px;
+    }
+
+    .workbench-frame {
+        padding: 14px 14px 0;
+    }
+
+    .workbench-viewport {
+        inset: 14px;
+    }
+
+    .controls-drawer {
+        position: absolute;
+        top: 22px;
+        right: 22px;
+        left: 22px;
+        width: auto;
+    }
+
+    .controls-drawer__body {
+        max-height: 48vh;
+    }
+}
+
+@media (pointer: coarse) {
+    .cursor-follower {
+        display: none;
+    }
+}

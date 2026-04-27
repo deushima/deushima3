@@ -2,7 +2,7 @@ import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
         import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
         import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -13,6 +13,32 @@ import * as THREE from 'three';
         // Inline startup SVG avoids file:// loading issues when opening index.html directly.
         const INITIAL_SVG_URL = './deushima.svg.svg'; 
         const INLINE_INITIAL_SVG = document.getElementById('initialSvgData')?.textContent?.trim() || '';
+        const workbenchViewport = document.getElementById('workbenchViewport');
+        const controlsDrawer = document.getElementById('controlsDrawer');
+        const controlsPanel = document.getElementById('controlsPanel');
+        const controlsToggle = document.getElementById('controlsToggle');
+        const controlsDrawerTitle = document.getElementById('controlsDrawerTitle');
+        const toolFiltersRoot = document.getElementById('toolFilters');
+        const toolListRoot = document.getElementById('toolList');
+        const toolInfoIndex = document.getElementById('toolInfoIndex');
+        const toolInfoMeta = document.getElementById('toolInfoMeta');
+        const toolInfoTitle = document.getElementById('toolInfoTitle');
+        const toolInfoDescription = document.getElementById('toolInfoDescription');
+        const hudBrandLogo = document.getElementById('hudBrandLogo');
+        const fileInput = document.getElementById('fileInput');
+        const textureInput = document.getElementById('textureInput');
+
+        document.title = 'Deushima Liquid Metal Workspace';
+        document.querySelectorAll('body > .sound-embed, body > .site-footer').forEach((node) => node.remove());
+
+        if (hudBrandLogo) {
+            hudBrandLogo.innerHTML = INLINE_INITIAL_SVG || `<img src="${INITIAL_SVG_URL}" alt="Deushima">`;
+        }
+
+        const getViewportSize = () => ({
+            width: Math.max(workbenchViewport?.clientWidth || window.innerWidth, 1),
+            height: Math.max(workbenchViewport?.clientHeight || window.innerHeight, 1)
+        });
 
         // --- GLSL NOISE FUNCTION ---
         const simplex3D = `
@@ -70,15 +96,17 @@ import * as THREE from 'three';
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(sceneSettings.bgColor);
 
-        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const initialViewport = getViewportSize();
+        const camera = new THREE.PerspectiveCamera(45, initialViewport.width / initialViewport.height, 0.1, 1000);
         camera.position.set(0, 0, 55);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setSize(initialViewport.width, initialViewport.height);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.3; 
-        document.body.appendChild(renderer.domElement);
+        renderer.domElement.classList.add('workbench-canvas');
+        (workbenchViewport || document.body).appendChild(renderer.domElement);
 
         const glowSettings = {
             enabled: true,
@@ -91,19 +119,21 @@ import * as THREE from 'three';
             enabled: true,
             intensity: 0.0021,
             angle: 1.48,
-            chromeLevel: 0.87,
+            chromeLevel: 0.0,
+            contrast: 1.0,
+            whiteExposure: 1.0,
             preset: 'balanced'
         };
 
         const composer = new EffectComposer(renderer);
         composer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        composer.setSize(window.innerWidth, window.innerHeight);
+        composer.setSize(initialViewport.width, initialViewport.height);
 
         const renderPass = new RenderPass(scene, camera);
         composer.addPass(renderPass);
 
         const bloomPass = new UnrealBloomPass(
-            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            new THREE.Vector2(initialViewport.width, initialViewport.height),
             glowSettings.strength,
             glowSettings.radius,
             glowSettings.threshold
@@ -114,6 +144,35 @@ import * as THREE from 'three';
         rgbShiftPass.uniforms.amount.value = chromaticSettings.intensity;
         rgbShiftPass.uniforms.angle.value = chromaticSettings.angle;
         composer.addPass(rgbShiftPass);
+
+        const gradePass = new ShaderPass({
+            uniforms: {
+                tDiffuse: { value: null },
+                uContrast: { value: chromaticSettings.contrast },
+                uExposure: { value: chromaticSettings.whiteExposure }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D tDiffuse;
+                uniform float uContrast;
+                uniform float uExposure;
+                varying vec2 vUv;
+
+                void main() {
+                    vec4 color = texture2D(tDiffuse, vUv);
+                    color.rgb *= uExposure;
+                    color.rgb = (color.rgb - 0.5) * uContrast + 0.5;
+                    gl_FragColor = color;
+                }
+            `
+        });
+        composer.addPass(gradePass);
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
@@ -520,6 +579,8 @@ import * as THREE from 'three';
             rgbShiftPass.enabled = chromaticSettings.enabled;
             rgbShiftPass.uniforms.amount.value = chromaticSettings.enabled ? chromaticSettings.intensity : 0.0;
             rgbShiftPass.uniforms.angle.value = chromaticSettings.angle;
+            gradePass.uniforms.uContrast.value = chromaticSettings.contrast;
+            gradePass.uniforms.uExposure.value = chromaticSettings.whiteExposure;
         }
 
         function applyGlassState() {
@@ -660,7 +721,6 @@ import * as THREE from 'three';
         const sceneFolder = gui.addFolder('Scene');
         sceneFolder.addColor(sceneSettings, 'bgColor').name('Background Color').onChange(v => {
             scene.background.set(v);
-            document.body.style.backgroundColor = v;
         });
 
         const effectFolder = gui.addFolder('Fluid Dynamics');
@@ -739,6 +799,12 @@ import * as THREE from 'three';
         chromaticFolder.add(chromaticSettings, 'chromeLevel', 0.0, 2.0, 0.01).name('Chrome Level').onChange(() => {
             applyChromeLevel();
         });
+        chromaticFolder.add(chromaticSettings, 'contrast', 0.5, 2.0, 0.01).name('Contrast').onChange(v => {
+            gradePass.uniforms.uContrast.value = v;
+        });
+        chromaticFolder.add(chromaticSettings, 'whiteExposure', 0.5, 2.0, 0.01).name('White Exposure').onChange(v => {
+            gradePass.uniforms.uExposure.value = v;
+        });
         chromaticFolder.add(chromaticSettings, 'preset', ['subtle', 'balanced', 'prism', 'glitch']).name('Variation').onChange(v => {
             applyChromaticPreset(v);
         });
@@ -765,8 +831,6 @@ import * as THREE from 'three';
             liquidMaterial.userData.uBevelFlowMix.value = bevelSettings.enableBevelDynamics ? v : 0.0;
         });
 
-        const fileInput = document.getElementById('fileInput');
-        const textureInput = document.getElementById('textureInput');
         const fileSettings = {
             svgUrl: INITIAL_SVG_URL,
             loadUrl: () => { loadSVGFromURL(fileSettings.svgUrl); },
@@ -807,6 +871,284 @@ import * as THREE from 'three';
         fileFolder.add(fileSettings, 'exportTransparent').name('Export PNG Transparent');
         fileFolder.add(fileSettings, 'resetDefault').name('Reset Logo');
 
+        if (controlsPanel) {
+            controlsPanel.appendChild(gui.domElement);
+        }
+
+        const toolCatalog = [
+            {
+                id: 'scene',
+                index: '01',
+                title: 'Escena',
+                meta: 'Visual · Fondo',
+                description: 'Controla el color de fondo de la mesa de trabajo para decidir si el logo vive sobre un negro pleno o sobre una base distinta.',
+                categories: ['all', 'visual'],
+                folder: sceneFolder
+            },
+            {
+                id: 'fluid',
+                index: '02',
+                title: 'Dinámica Fluida',
+                meta: 'Simulación · Fluido',
+                description: 'Define la vibración líquida del metal, cuánto se desplaza la materia sobre la forma y qué tan nítidos se mantienen sus bordes.',
+                categories: ['all', 'fluido'],
+                folder: effectFolder
+            },
+            {
+                id: 'iridescence',
+                index: '03',
+                title: 'Iridescencia',
+                meta: 'Color · Refracción',
+                description: 'Añade el desvío cromático interno del material y regula el espesor que determina cómo aparecen esos matices en la superficie.',
+                categories: ['all', 'material', 'color'],
+                folder: iridescenceFolder
+            },
+            {
+                id: 'material',
+                index: '04',
+                title: 'Material Base',
+                meta: 'Metal · Superficie',
+                description: 'Ajusta el cuerpo principal del logo: rugosidad, nivel metálico y la capa de brillo superior que define su pulido general.',
+                categories: ['all', 'material'],
+                folder: materialFolder
+            },
+            {
+                id: 'glass',
+                index: '05',
+                title: 'Textura Glass',
+                meta: 'Refracción · Vidrio',
+                description: 'Modifica la transparencia, la refracción y el tinte interno para llevar el logo hacia un look de vidrio o cristal líquido.',
+                categories: ['all', 'material', 'visual'],
+                folder: glassFolder
+            },
+            {
+                id: 'glow',
+                index: '06',
+                title: 'Glow',
+                meta: 'Luz · Halo',
+                description: 'Controla el halo alrededor del logo para sumar presencia sin romper la limpieza del diseño. Ideal para dar volumen sutil.',
+                categories: ['all', 'luz', 'post'],
+                folder: glowFolder
+            },
+            {
+                id: 'chromatic',
+                index: '07',
+                title: 'Cromático',
+                meta: 'Postproceso · Chrome',
+                description: 'Define la separación cromática, el contraste y la exposición blanca del render para darle un acabado más editorial o más agresivo.',
+                categories: ['all', 'post', 'color'],
+                folder: chromaticFolder
+            },
+            {
+                id: 'geometry',
+                index: '08',
+                title: 'Geometría',
+                meta: 'Extrusión · Forma',
+                description: 'Aquí decides el volumen real del logo: profundidad, bisel y la lectura general de la pieza en el espacio.',
+                categories: ['all', 'geometria'],
+                folder: geometryFolder
+            },
+            {
+                id: 'bevel',
+                index: '09',
+                title: 'Dinámica de Bisel',
+                meta: 'Geometría · Flujo',
+                description: 'Redirige el comportamiento del fluido hacia el bisel para que la materia siga el contorno de la forma con más intención.',
+                categories: ['all', 'geometria', 'fluido'],
+                folder: bevelFolder
+            },
+            {
+                id: 'environment',
+                index: '10',
+                title: 'Entorno',
+                meta: 'Iluminación · Textura',
+                description: 'Permite cargar una textura de entorno para alterar reflejos, iluminación y, si quieres, la lectura del propio material del logo.',
+                categories: ['all', 'entorno', 'visual'],
+                folder: environmentFolder
+            },
+            {
+                id: 'files',
+                index: '11',
+                title: 'Archivos',
+                meta: 'Importación · Exportación',
+                description: 'Gestiona el SVG, la carga de nuevos assets y la exportación final en PNG con fondo o transparente, sin incluir la esfera ambiental.',
+                categories: ['all', 'archivo'],
+                folder: fileFolder
+            }
+        ];
+
+        const filterCatalog = [
+            { id: 'all', label: 'Todas' },
+            { id: 'visual', label: 'Visual' },
+            { id: 'fluido', label: 'Fluido' },
+            { id: 'material', label: 'Material' },
+            { id: 'post', label: 'Post' },
+            { id: 'geometria', label: 'Geometría' },
+            { id: 'entorno', label: 'Entorno' },
+            { id: 'archivo', label: 'Archivo' }
+        ];
+
+        const hudToolCatalog = [
+            { id: 'scene', index: '01', title: 'Escena', meta: 'Visual / Fondo', description: 'Controla el color de fondo de la mesa de trabajo para decidir si el logo vive sobre un negro pleno o sobre una base distinta.', categories: ['all', 'visual'], folder: sceneFolder },
+            { id: 'fluid', index: '02', title: 'Dinamica Fluida', meta: 'Simulacion / Fluido', description: 'Define la vibracion liquida del metal, cuanto se desplaza la materia sobre la forma y que tan nitidos se mantienen sus bordes.', categories: ['all', 'fluido'], folder: effectFolder },
+            { id: 'iridescence', index: '03', title: 'Iridescencia', meta: 'Color / Refraccion', description: 'Anade el desvio cromatico interno del material y regula el espesor que determina como aparecen esos matices en la superficie.', categories: ['all', 'material', 'color'], folder: iridescenceFolder },
+            { id: 'material', index: '04', title: 'Material Base', meta: 'Metal / Superficie', description: 'Ajusta el cuerpo principal del logo: rugosidad, nivel metalico y la capa de brillo superior que define su pulido general.', categories: ['all', 'material'], folder: materialFolder },
+            { id: 'glass', index: '05', title: 'Textura Glass', meta: 'Refraccion / Vidrio', description: 'Modifica la transparencia, la refraccion y el tinte interno para llevar el logo hacia un look de vidrio o cristal liquido.', categories: ['all', 'material', 'visual'], folder: glassFolder },
+            { id: 'glow', index: '06', title: 'Glow', meta: 'Luz / Halo', description: 'Controla el halo alrededor del logo para sumar presencia sin romper la limpieza del diseno. Ideal para dar volumen sutil.', categories: ['all', 'luz', 'post'], folder: glowFolder },
+            { id: 'chromatic', index: '07', title: 'Cromatico', meta: 'Postproceso / Chrome', description: 'Define la separacion cromatica, el contraste y la exposicion blanca del render para darle un acabado mas editorial o mas agresivo.', categories: ['all', 'post', 'color'], folder: chromaticFolder },
+            { id: 'geometry', index: '08', title: 'Geometria', meta: 'Extrusion / Forma', description: 'Aqui decides el volumen real del logo: profundidad, bisel y la lectura general de la pieza en el espacio.', categories: ['all', 'geometria'], folder: geometryFolder },
+            { id: 'bevel', index: '09', title: 'Dinamica de Bisel', meta: 'Geometria / Flujo', description: 'Redirige el comportamiento del fluido hacia el bisel para que la materia siga el contorno de la forma con mas intencion.', categories: ['all', 'geometria', 'fluido'], folder: bevelFolder },
+            { id: 'environment', index: '10', title: 'Entorno', meta: 'Iluminacion / Textura', description: 'Permite cargar una textura de entorno para alterar reflejos, iluminacion y, si quieres, la lectura del propio material del logo.', categories: ['all', 'entorno', 'visual'], folder: environmentFolder },
+            { id: 'files', index: '11', title: 'Archivos', meta: 'Importacion / Exportacion', description: 'Gestiona el SVG, la carga de nuevos assets y la exportacion final en PNG con fondo o transparente, sin incluir la esfera ambiental.', categories: ['all', 'archivo'], folder: fileFolder }
+        ];
+
+        const hudFilterCatalog = [
+            { id: 'all', label: 'Todas' },
+            { id: 'visual', label: 'Visual' },
+            { id: 'fluido', label: 'Fluido' },
+            { id: 'material', label: 'Material' },
+            { id: 'post', label: 'Post' },
+            { id: 'geometria', label: 'Geometria' },
+            { id: 'entorno', label: 'Entorno' },
+            { id: 'archivo', label: 'Archivo' }
+        ];
+
+        let activeToolId = 'fluid';
+        let hoveredToolId = null;
+        let activeFilterId = 'all';
+
+        function setDrawerState(isOpen) {
+            if (!controlsDrawer || !controlsToggle) return;
+            controlsDrawer.classList.toggle('is-open', isOpen);
+            controlsToggle.setAttribute('aria-expanded', String(isOpen));
+        }
+
+        function syncFolderVisibility(selectedId) {
+            for (const tool of hudToolCatalog) {
+                const isSelected = tool.id === selectedId;
+                tool.folder.domElement.style.display = isSelected ? '' : 'none';
+                if (isSelected) {
+                    tool.folder.open();
+                } else {
+                    tool.folder.close();
+                }
+            }
+        }
+
+        function renderInfo(tool) {
+            if (!tool) return;
+            if (toolInfoIndex) toolInfoIndex.textContent = tool.index;
+            if (toolInfoMeta) toolInfoMeta.textContent = tool.meta;
+            if (toolInfoTitle) toolInfoTitle.textContent = tool.title;
+            if (toolInfoDescription) toolInfoDescription.textContent = tool.description;
+            if (controlsDrawerTitle) controlsDrawerTitle.textContent = tool.title;
+        }
+
+        function renderToolCards() {
+            if (!toolListRoot) return;
+            toolListRoot.innerHTML = '';
+
+            for (const tool of hudToolCatalog) {
+                const card = document.createElement('button');
+                card.type = 'button';
+                card.className = 'tool-card';
+                card.dataset.toolId = tool.id;
+                card.innerHTML = `
+                    <span class="tool-card__index">${tool.index}</span>
+                    <span class="tool-card__content">
+                        <span class="tool-card__title">${tool.title}</span>
+                        <span class="tool-card__meta">${tool.meta}</span>
+                    </span>
+                    <span class="tool-card__arrow">↗</span>
+                `;
+
+                card.querySelector('.tool-card__arrow').innerHTML = '&#8599;';
+
+                card.addEventListener('mouseenter', () => {
+                    hoveredToolId = tool.id;
+                    renderInfo(tool);
+                });
+
+                card.addEventListener('mouseleave', () => {
+                    hoveredToolId = null;
+                    renderInfo(hudToolCatalog.find((entry) => entry.id === activeToolId));
+                });
+
+                card.addEventListener('click', () => {
+                    activeToolId = tool.id;
+                    renderInfo(tool);
+                    syncFolderVisibility(tool.id);
+                    updateToolCardState();
+                    setDrawerState(true);
+                });
+
+                toolListRoot.appendChild(card);
+            }
+        }
+
+        function renderFilters() {
+            if (!toolFiltersRoot) return;
+            toolFiltersRoot.innerHTML = '';
+
+            for (const filter of hudFilterCatalog) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'tool-filter';
+                button.dataset.filterId = filter.id;
+                button.textContent = filter.label;
+                button.addEventListener('click', () => {
+                    activeFilterId = filter.id;
+                    updateFilterState();
+                    updateToolCardState();
+                });
+                toolFiltersRoot.appendChild(button);
+            }
+        }
+
+        function updateFilterState() {
+            if (!toolFiltersRoot) return;
+            for (const button of toolFiltersRoot.querySelectorAll('.tool-filter')) {
+                button.classList.toggle('is-active', button.dataset.filterId === activeFilterId);
+            }
+        }
+
+        function updateToolCardState() {
+            if (!toolListRoot) return;
+            let firstVisibleTool = null;
+            for (const card of toolListRoot.querySelectorAll('.tool-card')) {
+                const tool = hudToolCatalog.find((entry) => entry.id === card.dataset.toolId);
+                const matchesFilter = activeFilterId === 'all' || tool.categories.includes(activeFilterId);
+                if (matchesFilter && !firstVisibleTool) {
+                    firstVisibleTool = tool;
+                }
+                card.hidden = !matchesFilter;
+                card.classList.toggle('is-active', card.dataset.toolId === activeToolId);
+            }
+
+            const activeTool = hudToolCatalog.find((entry) => entry.id === activeToolId);
+            const activeMatches = activeTool && (activeFilterId === 'all' || activeTool.categories.includes(activeFilterId));
+            if (!activeMatches && firstVisibleTool) {
+                activeToolId = firstVisibleTool.id;
+                syncFolderVisibility(activeToolId);
+                renderInfo(firstVisibleTool);
+                for (const card of toolListRoot.querySelectorAll('.tool-card')) {
+                    card.classList.toggle('is-active', card.dataset.toolId === activeToolId);
+                }
+            }
+        }
+
+        controlsToggle?.addEventListener('click', () => {
+            setDrawerState(!controlsDrawer.classList.contains('is-open'));
+        });
+
+        renderFilters();
+        renderToolCards();
+        updateFilterState();
+        syncFolderVisibility(activeToolId);
+        updateToolCardState();
+        renderInfo(hudToolCatalog.find((entry) => entry.id === activeToolId));
+        setDrawerState(true);
+
         fileInput.addEventListener('change', (event) => {
             const file = event.target.files[0];
             if (file) {
@@ -842,13 +1184,21 @@ import * as THREE from 'three';
             composer.render();
         }
 
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
+        function resizeWorkbench() {
+            const { width, height } = getViewportSize();
+            camera.aspect = width / height;
             camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            composer.setSize(window.innerWidth, window.innerHeight);
-            bloomPass.setSize(window.innerWidth, window.innerHeight);
-        });
+            renderer.setSize(width, height);
+            composer.setSize(width, height);
+            bloomPass.setSize(width, height);
+        }
+
+        window.addEventListener('resize', resizeWorkbench);
+        if (window.ResizeObserver && workbenchViewport) {
+            const resizeObserver = new ResizeObserver(() => resizeWorkbench());
+            resizeObserver.observe(workbenchViewport);
+        }
+        resizeWorkbench();
 
         // --- CURSOR FOLLOWER ---
         if (window.matchMedia('(pointer: fine)').matches) {
