@@ -157,7 +157,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         };
 
         const edgeSmoothSettings = {
-            enabled: true,
+            enabled: false,
             strength: 0.85
         };
 
