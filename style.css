@@ -555,6 +555,17 @@ body > .site-footer {
     background: linear-gradient(90deg, rgba(255, 255, 255, 0.94) 0%, rgba(204, 204, 204, 0.82) 100%);
 }
 
+.controls-drawer__body .lil-gui .slider > *,
+.controls-drawer__body .lil-gui .slider::before,
+.controls-drawer__body .lil-gui .slider::after {
+    background-color: #ffffff !important;
+    border-color: #ffffff !important;
+}
+
+.controls-drawer__body .lil-gui input[type="range"] {
+    accent-color: #ffffff;
+}
+
 .controls-drawer__body .lil-gui input,
 .controls-drawer__body .lil-gui button,
 .controls-drawer__body .lil-gui select {
@@ -568,6 +579,103 @@ body > .site-footer {
     border: 1px solid rgba(255, 255, 255, 0.08);
     background: rgba(255, 255, 255, 0.04);
     color: rgba(255, 255, 255, 0.92);
+}
+
+.gradient-stops-ui {
+    display: grid;
+    gap: 8px;
+    margin: 8px 0 4px;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.gradient-stops-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: rgba(255, 255, 255, 0.56);
+    font: 640 10px/1 "Inter Variable", sans-serif;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.gradient-stop-add,
+.gradient-stop-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 999px !important;
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.9);
+    font: 700 15px/1 "Inter Variable", sans-serif;
+}
+
+.gradient-stop-remove {
+    width: 22px;
+    height: 22px;
+    font-size: 11px;
+    opacity: 0.68;
+}
+
+.gradient-stop-row {
+    display: grid;
+    grid-template-columns: 18px minmax(54px, 0.8fr) 30px minmax(82px, 1fr) 34px 24px;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 6px;
+    border: 1px solid rgba(255, 255, 255, 0.055);
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.gradient-stop-row.is-dragging {
+    opacity: 0.45;
+}
+
+.gradient-stop-handle {
+    color: rgba(255, 255, 255, 0.38);
+    font: 700 12px/1 "Inter Variable", sans-serif;
+    cursor: grab;
+}
+
+.gradient-stop-label,
+.gradient-stop-color,
+.gradient-stop-position {
+    min-width: 0;
+}
+
+.gradient-stop-label {
+    width: 100%;
+    border: 0 !important;
+    background: transparent !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+    padding: 0 !important;
+    font: 560 11px/1 "Inter Variable", sans-serif;
+}
+
+.gradient-stop-color {
+    width: 30px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px !important;
+    background: transparent;
+}
+
+.gradient-stop-position {
+    width: 100%;
+    accent-color: #ffffff;
+}
+
+.gradient-stop-value {
+    color: rgba(255, 255, 255, 0.48);
+    font: 560 10px/1 "Inter Variable", sans-serif;
+    text-align: right;
 }
 
 @media (max-width: 1180px) {

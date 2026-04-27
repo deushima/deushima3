@@ -138,9 +138,12 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             enabled: false,
             amount: 1.0,
             smoothness: 1.0,
-            midpoint: 0.5,
-            shadows: '#000000',
-            highlights: '#ffffff'
+            addStop: () => { addGradientStop(); },
+            stops: [
+                { id: 'shadow', label: 'Sombra', color: '#000000', position: 0.0 },
+                { id: 'midtone', label: 'Medio', color: '#808080', position: 0.5 },
+                { id: 'highlight', label: 'Luz', color: '#ffffff', position: 1.0 }
+            ]
         };
 
         const export360Settings = {
@@ -156,7 +159,10 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             startTime: 0,
             durationMs: 6000,
             initialRotationY: 0,
-            clockwise: true
+            clockwise: true,
+            cameraPosition: new THREE.Vector3(),
+            cameraQuaternion: new THREE.Quaternion(),
+            controlsTarget: new THREE.Vector3()
         };
 
         const composer = new EffectComposer(renderer);
@@ -213,9 +219,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
                 tDiffuse: { value: null },
                 uAmount: { value: gradientMapSettings.amount },
                 uSmoothness: { value: gradientMapSettings.smoothness },
-                uMidpoint: { value: gradientMapSettings.midpoint },
-                uShadowColor: { value: new THREE.Color(gradientMapSettings.shadows) },
-                uHighlightColor: { value: new THREE.Color(gradientMapSettings.highlights) }
+                uStopCount: { value: gradientMapSettings.stops.length },
+                uStopColors: { value: Array.from({ length: 8 }, () => new THREE.Color('#000000')) },
+                uStopPositions: { value: new Array(8).fill(0) }
             },
             vertexShader: `
                 varying vec2 vUv;
@@ -228,17 +234,31 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
                 uniform sampler2D tDiffuse;
                 uniform float uAmount;
                 uniform float uSmoothness;
-                uniform float uMidpoint;
-                uniform vec3 uShadowColor;
-                uniform vec3 uHighlightColor;
+                uniform int uStopCount;
+                uniform vec3 uStopColors[8];
+                uniform float uStopPositions[8];
                 varying vec2 vUv;
 
                 void main() {
                     vec4 color = texture2D(tDiffuse, vUv);
                     float luma = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-                    float width = max(uSmoothness, 0.001);
-                    float mappedPosition = smoothstep(uMidpoint - width * 0.5, uMidpoint + width * 0.5, luma);
-                    vec3 mapped = mix(uShadowColor, uHighlightColor, mappedPosition);
+
+                    vec3 mapped = uStopColors[0];
+                    for (int i = 0; i < 7; i++) {
+                        if (i >= uStopCount - 1) {
+                            break;
+                        }
+
+                        float left = uStopPositions[i];
+                        float right = max(uStopPositions[i + 1], left + 0.0001);
+                        float t = clamp((luma - left) / (right - left), 0.0, 1.0);
+                        t = mix(step(0.5, t), smoothstep(0.0, 1.0, t), uSmoothness);
+
+                        if (luma >= left) {
+                            mapped = mix(uStopColors[i], uStopColors[i + 1], t);
+                        }
+                    }
+
                     color.rgb = mix(color.rgb, mapped, uAmount);
                     gl_FragColor = color;
                 }
@@ -590,6 +610,8 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         };
 
         const svgGroup = new THREE.Group();
+        const svgContent = new THREE.Group();
+        svgGroup.add(svgContent);
         scene.add(svgGroup);
         const svgLoader = new SVGLoader();
         let currentSVGData = null;
@@ -664,8 +686,16 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             export360State.active = true;
             export360State.startTime = performance.now();
             export360State.durationMs = export360Settings.duration * 1000;
-            export360State.initialRotationY = svgGroup.rotation.y;
+            export360State.initialRotationY = 0;
             export360State.clockwise = export360Settings.clockwise;
+            export360State.cameraPosition.copy(camera.position);
+            export360State.cameraQuaternion.copy(camera.quaternion);
+            export360State.controlsTarget.copy(controls.target);
+
+            svgGroup.rotation.set(0, 0, 0);
+            camera.position.set(0, compositionSettings.verticalOffset, compositionSettings.cameraDistance);
+            controls.target.set(0, compositionSettings.verticalOffset, 0);
+            controls.update();
 
             recorder.ondataavailable = (event) => {
                 if (event.data && event.data.size > 0) {
@@ -676,6 +706,10 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             recorder.onstop = () => {
                 export360State.active = false;
                 svgGroup.rotation.y = export360State.initialRotationY;
+                camera.position.copy(export360State.cameraPosition);
+                camera.quaternion.copy(export360State.cameraQuaternion);
+                controls.target.copy(export360State.controlsTarget);
+                controls.update();
                 stream.getTracks().forEach((track) => track.stop());
 
                 const blob = new Blob(chunks, { type: mimeType });
@@ -745,12 +779,150 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         }
 
         function applyGradientMapState() {
+            const orderedStops = [...gradientMapSettings.stops]
+                .sort((a, b) => a.position - b.position)
+                .slice(0, 8);
+
             gradientMapPass.enabled = gradientMapSettings.enabled;
             gradientMapPass.uniforms.uAmount.value = gradientMapSettings.amount;
             gradientMapPass.uniforms.uSmoothness.value = gradientMapSettings.smoothness;
-            gradientMapPass.uniforms.uMidpoint.value = gradientMapSettings.midpoint;
-            gradientMapPass.uniforms.uShadowColor.value.set(gradientMapSettings.shadows);
-            gradientMapPass.uniforms.uHighlightColor.value.set(gradientMapSettings.highlights);
+            gradientMapPass.uniforms.uStopCount.value = orderedStops.length;
+
+            for (let i = 0; i < 8; i++) {
+                const stop = orderedStops[i] || orderedStops[orderedStops.length - 1] || gradientMapSettings.stops[0];
+                gradientMapPass.uniforms.uStopColors.value[i].set(stop.color);
+                gradientMapPass.uniforms.uStopPositions.value[i] = stop.position;
+            }
+        }
+
+        let gradientStopSerial = 0;
+        let gradientStopsRoot = null;
+
+        function clamp01(value) {
+            return Math.min(1, Math.max(0, value));
+        }
+
+        function rebalanceGradientStopsByOrder() {
+            const count = gradientMapSettings.stops.length;
+            if (count <= 1) {
+                gradientMapSettings.stops[0].position = 0.5;
+                return;
+            }
+
+            gradientMapSettings.stops.forEach((stop, index) => {
+                stop.position = index / (count - 1);
+            });
+        }
+
+        function addGradientStop() {
+            if (gradientMapSettings.stops.length >= 8) {
+                alert('Gradient Map permite hasta 8 colores.');
+                return;
+            }
+
+            gradientMapSettings.stops.push({
+                id: `stop-${Date.now()}-${gradientStopSerial++}`,
+                label: `Color ${gradientMapSettings.stops.length + 1}`,
+                color: '#ffffff',
+                position: 0.5
+            });
+
+            rebalanceGradientStopsByOrder();
+            renderGradientStopsUI();
+            applyGradientMapState();
+        }
+
+        function removeGradientStop(stopId) {
+            if (gradientMapSettings.stops.length <= 2) return;
+            gradientMapSettings.stops = gradientMapSettings.stops.filter((stop) => stop.id !== stopId);
+            rebalanceGradientStopsByOrder();
+            renderGradientStopsUI();
+            applyGradientMapState();
+        }
+
+        function moveGradientStop(draggedId, targetId) {
+            if (draggedId === targetId) return;
+
+            const draggedIndex = gradientMapSettings.stops.findIndex((stop) => stop.id === draggedId);
+            const targetIndex = gradientMapSettings.stops.findIndex((stop) => stop.id === targetId);
+            if (draggedIndex < 0 || targetIndex < 0) return;
+
+            const [draggedStop] = gradientMapSettings.stops.splice(draggedIndex, 1);
+            gradientMapSettings.stops.splice(targetIndex, 0, draggedStop);
+            rebalanceGradientStopsByOrder();
+            renderGradientStopsUI();
+            applyGradientMapState();
+        }
+
+        function renderGradientStopsUI() {
+            if (!gradientStopsRoot) return;
+
+            gradientStopsRoot.innerHTML = '';
+
+            const toolbar = document.createElement('div');
+            toolbar.className = 'gradient-stops-toolbar';
+            toolbar.innerHTML = `
+                <span>Stops</span>
+                <button type="button" class="gradient-stop-add" title="Agregar color">+</button>
+            `;
+            toolbar.querySelector('.gradient-stop-add').addEventListener('click', addGradientStop);
+            gradientStopsRoot.appendChild(toolbar);
+
+            gradientMapSettings.stops.forEach((stop) => {
+                const row = document.createElement('div');
+                row.className = 'gradient-stop-row';
+                row.draggable = true;
+                row.dataset.stopId = stop.id;
+                row.innerHTML = `
+                    <span class="gradient-stop-handle" title="Arrastrar prioridad">::</span>
+                    <input class="gradient-stop-label" type="text" value="${stop.label}" aria-label="Nombre del color">
+                    <input class="gradient-stop-color" type="color" value="${stop.color}" aria-label="Color">
+                    <input class="gradient-stop-position" type="range" min="0" max="1" step="0.01" value="${stop.position}" aria-label="Posicion tonal">
+                    <span class="gradient-stop-value">${stop.position.toFixed(2)}</span>
+                    <button class="gradient-stop-remove" type="button" title="Eliminar color">x</button>
+                `;
+
+                row.addEventListener('dragstart', (event) => {
+                    event.dataTransfer.setData('text/plain', stop.id);
+                    event.dataTransfer.effectAllowed = 'move';
+                    row.classList.add('is-dragging');
+                });
+
+                row.addEventListener('dragend', () => {
+                    row.classList.remove('is-dragging');
+                });
+
+                row.addEventListener('dragover', (event) => {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = 'move';
+                });
+
+                row.addEventListener('drop', (event) => {
+                    event.preventDefault();
+                    moveGradientStop(event.dataTransfer.getData('text/plain'), stop.id);
+                });
+
+                row.querySelector('.gradient-stop-label').addEventListener('input', (event) => {
+                    stop.label = event.target.value || 'Color';
+                });
+
+                row.querySelector('.gradient-stop-color').addEventListener('input', (event) => {
+                    stop.color = event.target.value;
+                    applyGradientMapState();
+                });
+
+                row.querySelector('.gradient-stop-position').addEventListener('input', (event) => {
+                    stop.position = clamp01(Number(event.target.value));
+                    row.querySelector('.gradient-stop-value').textContent = stop.position.toFixed(2);
+                    applyGradientMapState();
+                });
+
+                row.querySelector('.gradient-stop-remove').addEventListener('click', () => {
+                    removeGradientStop(stop.id);
+                });
+
+                gradientStopsRoot.appendChild(row);
+            });
         }
 
         function applyGlassState() {
@@ -794,11 +966,14 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             svgGroup.position.set(0, 0, 0);
             svgGroup.scale.set(1, 1, 1);
             svgGroup.rotation.set(0, 0, 0);
+            svgContent.position.set(0, 0, 0);
+            svgContent.scale.set(1, 1, 1);
+            svgContent.rotation.set(0, 0, 0);
             svgGroup.updateMatrixWorld();
 
-            while(svgGroup.children.length > 0){ 
-                const child = svgGroup.children[0];
-                svgGroup.remove(child); 
+            while(svgContent.children.length > 0){ 
+                const child = svgContent.children[0];
+                svgContent.remove(child); 
                 if (child.geometry) child.geometry.dispose();
             }
 
@@ -818,7 +993,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
                     allShapes.push(shape);
                     const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
                     const mesh = new THREE.Mesh(geometry, liquidMaterial);
-                    svgGroup.add(mesh);
+                    svgContent.add(mesh);
                 }
             }
 
@@ -828,23 +1003,19 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 
             // --- PERFECT CENTERING FIX ---
             // 1. Calculate proper scale before moving anything
-            const box = new THREE.Box3().setFromObject(svgGroup);
+            const box = new THREE.Box3().setFromObject(svgContent);
             const size = box.getSize(new THREE.Vector3());
             const maxDim = Math.max(size.x, size.y, size.z);
+            const rawCenter = box.getCenter(new THREE.Vector3());
             
             if (maxDim > 0) {
                 const scale = compositionSettings.logoFitSize / maxDim; 
                 svgGroup.scale.set(scale, -scale, scale); 
             }
 
-            // 2. Recalculate bounding box AFTER scale is applied
-            svgGroup.updateMatrixWorld();
-            const scaledBox = new THREE.Box3().setFromObject(svgGroup);
-            const finalCenter = scaledBox.getCenter(new THREE.Vector3());
-            
-            // 3. Move group into absolute center of the camera view and lift it slightly
-            // so the composition feels visually centered within the workbench.
-            svgGroup.position.sub(finalCenter);
+            // 2. Center the content inside the parent pivot so rotation stays locked
+            // to the logo's visual center instead of orbiting around the SVG origin.
+            svgContent.position.sub(rawCenter);
             svgGroup.position.y += compositionSettings.verticalOffset;
             controls.target.set(0, compositionSettings.verticalOffset, 0);
             controls.update();
@@ -987,21 +1158,17 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         gradientMapFolder.add(gradientMapSettings, 'enabled').name('Enable Gradient Map').onChange(() => {
             applyGradientMapState();
         });
-        gradientMapFolder.addColor(gradientMapSettings, 'shadows').name('Shadows').onChange(() => {
-            applyGradientMapState();
-        });
-        gradientMapFolder.addColor(gradientMapSettings, 'highlights').name('Highlights').onChange(() => {
-            applyGradientMapState();
-        });
         gradientMapFolder.add(gradientMapSettings, 'amount', 0.0, 1.0, 0.01).name('Amount').onChange(() => {
-            applyGradientMapState();
-        });
-        gradientMapFolder.add(gradientMapSettings, 'midpoint', 0.0, 1.0, 0.01).name('Midpoint').onChange(() => {
             applyGradientMapState();
         });
         gradientMapFolder.add(gradientMapSettings, 'smoothness', 0.01, 1.0, 0.01).name('Smoothness').onChange(() => {
             applyGradientMapState();
         });
+        gradientMapFolder.add(gradientMapSettings, 'addStop').name('+ Add Color');
+        gradientStopsRoot = document.createElement('div');
+        gradientStopsRoot.className = 'gradient-stops-ui';
+        (gradientMapFolder.domElement.querySelector('.children') || gradientMapFolder.domElement).appendChild(gradientStopsRoot);
+        renderGradientStopsUI();
 
         const geometryFolder = gui.addFolder('Geometry');
         geometryFolder.add(geometrySettings, 'depth', 20.0, 1200.0, 10.0).name('Extrude Depth').onChange(() => {
@@ -1400,14 +1567,20 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 
         function resizeWorkbench() {
             const { width, height } = getViewportSize();
+            const pixelRatio = Math.min(window.devicePixelRatio, 2);
             camera.aspect = width / height;
             camera.updateProjectionMatrix();
+            renderer.setPixelRatio(pixelRatio);
             renderer.setSize(width, height);
+            renderer.setViewport(0, 0, width, height);
             composer.setSize(width, height);
+            composer.setPixelRatio(pixelRatio);
             bloomPass.setSize(width, height);
         }
 
         window.addEventListener('resize', resizeWorkbench);
+        window.visualViewport?.addEventListener('resize', resizeWorkbench);
+        window.visualViewport?.addEventListener('scroll', resizeWorkbench);
         if (window.ResizeObserver && workbenchViewport) {
             const resizeObserver = new ResizeObserver(() => resizeWorkbench());
             resizeObserver.observe(workbenchViewport);
