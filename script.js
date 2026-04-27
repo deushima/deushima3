@@ -504,7 +504,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 
         const bevelSettings = {
             enableBevelDynamics: false,
-            bevelSize: 2.5,
+            bevelSize: 4.6,
             bevelThickness: 2.5,
             bevelSegments: 96,
             bevelFlowInfluence: 1.17
