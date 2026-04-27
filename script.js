@@ -41,7 +41,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             height: Math.max(workbenchViewport?.clientHeight || window.innerHeight, 1)
         });
         const compositionSettings = {
-            verticalOffset: 3.4
+            verticalOffset: 3.0,
+            logoFitSize: 39,
+            cameraDistance: 43
         };
 
         // --- GLSL NOISE FUNCTION ---
@@ -102,11 +104,14 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 
         const initialViewport = getViewportSize();
         const camera = new THREE.PerspectiveCamera(45, initialViewport.width / initialViewport.height, 0.1, 1000);
-        camera.position.set(0, 0, 55);
+        camera.position.set(0, 0, compositionSettings.cameraDistance);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
         renderer.setSize(initialViewport.width, initialViewport.height);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.autoClear = true;
+        renderer.setClearColor(0x000000, 1);
+        renderer.setClearAlpha(1);
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.3; 
         renderer.domElement.classList.add('workbench-canvas');
@@ -127,6 +132,31 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             contrast: 1.0,
             whiteExposure: 1.0,
             preset: 'balanced'
+        };
+
+        const gradientMapSettings = {
+            enabled: false,
+            amount: 1.0,
+            smoothness: 1.0,
+            midpoint: 0.5,
+            shadows: '#000000',
+            highlights: '#ffffff'
+        };
+
+        const export360Settings = {
+            duration: 6,
+            fps: 30,
+            qualityMbps: 12,
+            clockwise: true,
+            exportVideo: () => { export360Video(); }
+        };
+
+        const export360State = {
+            active: false,
+            startTime: 0,
+            durationMs: 6000,
+            initialRotationY: 0,
+            clockwise: true
         };
 
         const composer = new EffectComposer(renderer);
@@ -177,6 +207,45 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             `
         });
         composer.addPass(gradePass);
+
+        const gradientMapPass = new ShaderPass({
+            uniforms: {
+                tDiffuse: { value: null },
+                uAmount: { value: gradientMapSettings.amount },
+                uSmoothness: { value: gradientMapSettings.smoothness },
+                uMidpoint: { value: gradientMapSettings.midpoint },
+                uShadowColor: { value: new THREE.Color(gradientMapSettings.shadows) },
+                uHighlightColor: { value: new THREE.Color(gradientMapSettings.highlights) }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D tDiffuse;
+                uniform float uAmount;
+                uniform float uSmoothness;
+                uniform float uMidpoint;
+                uniform vec3 uShadowColor;
+                uniform vec3 uHighlightColor;
+                varying vec2 vUv;
+
+                void main() {
+                    vec4 color = texture2D(tDiffuse, vUv);
+                    float luma = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+                    float width = max(uSmoothness, 0.001);
+                    float mappedPosition = smoothstep(uMidpoint - width * 0.5, uMidpoint + width * 0.5, luma);
+                    vec3 mapped = mix(uShadowColor, uHighlightColor, mappedPosition);
+                    color.rgb = mix(color.rgb, mapped, uAmount);
+                    gl_FragColor = color;
+                }
+            `
+        });
+        gradientMapPass.enabled = gradientMapSettings.enabled;
+        composer.addPass(gradientMapPass);
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
@@ -534,6 +603,94 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             link.remove();
         }
 
+        function downloadBlob(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        function getSupportedVideoMimeTypes() {
+            return [
+                'video/mp4;codecs=avc1.42E01E',
+                'video/mp4',
+                'video/webm;codecs=vp9',
+                'video/webm;codecs=vp8',
+                'video/webm'
+            ].filter((type) => MediaRecorder.isTypeSupported(type));
+        }
+
+        function export360Video() {
+            if (export360State.active) return;
+            if (!renderer.domElement.captureStream || !window.MediaRecorder) {
+                alert('Tu navegador no soporta grabacion de video desde canvas.');
+                return;
+            }
+
+            const mimeTypes = getSupportedVideoMimeTypes();
+            if (!mimeTypes.length) {
+                alert('Tu navegador no tiene un formato de video compatible para exportar.');
+                return;
+            }
+
+            const stream = renderer.domElement.captureStream(export360Settings.fps);
+            const chunks = [];
+            let mimeType = '';
+            let recorder = null;
+
+            for (const candidate of mimeTypes) {
+                try {
+                    recorder = new MediaRecorder(stream, {
+                        mimeType: candidate,
+                        videoBitsPerSecond: export360Settings.qualityMbps * 1000000
+                    });
+                    mimeType = candidate;
+                    break;
+                } catch (error) {
+                    recorder = null;
+                }
+            }
+
+            if (!recorder) {
+                stream.getTracks().forEach((track) => track.stop());
+                alert('No se pudo iniciar la grabacion de video en este navegador.');
+                return;
+            }
+
+            export360State.active = true;
+            export360State.startTime = performance.now();
+            export360State.durationMs = export360Settings.duration * 1000;
+            export360State.initialRotationY = svgGroup.rotation.y;
+            export360State.clockwise = export360Settings.clockwise;
+
+            recorder.ondataavailable = (event) => {
+                if (event.data && event.data.size > 0) {
+                    chunks.push(event.data);
+                }
+            };
+
+            recorder.onstop = () => {
+                export360State.active = false;
+                svgGroup.rotation.y = export360State.initialRotationY;
+                stream.getTracks().forEach((track) => track.stop());
+
+                const blob = new Blob(chunks, { type: mimeType });
+                const extension = mimeType.includes('mp4') ? 'mp4' : 'webm';
+                downloadBlob(blob, `deushima-360.${extension}`);
+            };
+
+            recorder.start();
+            setTimeout(() => {
+                if (recorder.state !== 'inactive') {
+                    recorder.stop();
+                }
+            }, export360State.durationMs + 120);
+        }
+
         function exportPNG({ transparent = false } = {}) {
             const originalBackground = scene.background;
             const originalClearAlpha = renderer.getClearAlpha();
@@ -585,6 +742,15 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             rgbShiftPass.uniforms.angle.value = chromaticSettings.angle;
             gradePass.uniforms.uContrast.value = chromaticSettings.contrast;
             gradePass.uniforms.uExposure.value = chromaticSettings.whiteExposure;
+        }
+
+        function applyGradientMapState() {
+            gradientMapPass.enabled = gradientMapSettings.enabled;
+            gradientMapPass.uniforms.uAmount.value = gradientMapSettings.amount;
+            gradientMapPass.uniforms.uSmoothness.value = gradientMapSettings.smoothness;
+            gradientMapPass.uniforms.uMidpoint.value = gradientMapSettings.midpoint;
+            gradientMapPass.uniforms.uShadowColor.value.set(gradientMapSettings.shadows);
+            gradientMapPass.uniforms.uHighlightColor.value.set(gradientMapSettings.highlights);
         }
 
         function applyGlassState() {
@@ -667,7 +833,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             const maxDim = Math.max(size.x, size.y, size.z);
             
             if (maxDim > 0) {
-                const scale = 25 / maxDim; 
+                const scale = compositionSettings.logoFitSize / maxDim; 
                 svgGroup.scale.set(scale, -scale, scale); 
             }
 
@@ -817,6 +983,26 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             applyChromaticPreset(v);
         });
 
+        const gradientMapFolder = gui.addFolder('Gradient Map');
+        gradientMapFolder.add(gradientMapSettings, 'enabled').name('Enable Gradient Map').onChange(() => {
+            applyGradientMapState();
+        });
+        gradientMapFolder.addColor(gradientMapSettings, 'shadows').name('Shadows').onChange(() => {
+            applyGradientMapState();
+        });
+        gradientMapFolder.addColor(gradientMapSettings, 'highlights').name('Highlights').onChange(() => {
+            applyGradientMapState();
+        });
+        gradientMapFolder.add(gradientMapSettings, 'amount', 0.0, 1.0, 0.01).name('Amount').onChange(() => {
+            applyGradientMapState();
+        });
+        gradientMapFolder.add(gradientMapSettings, 'midpoint', 0.0, 1.0, 0.01).name('Midpoint').onChange(() => {
+            applyGradientMapState();
+        });
+        gradientMapFolder.add(gradientMapSettings, 'smoothness', 0.01, 1.0, 0.01).name('Smoothness').onChange(() => {
+            applyGradientMapState();
+        });
+
         const geometryFolder = gui.addFolder('Geometry');
         geometryFolder.add(geometrySettings, 'depth', 20.0, 1200.0, 10.0).name('Extrude Depth').onChange(() => {
             rebuildCurrentSVG();
@@ -870,6 +1056,13 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         });
         environmentFolder.add(environmentTextureSettings, 'uploadTexture').name('Upload PNG Texture');
         environmentFolder.add(environmentTextureSettings, 'clearTexture').name('Clear Texture');
+
+        const export360Folder = gui.addFolder('Export 360 Video');
+        export360Folder.add(export360Settings, 'duration', 2, 20, 1).name('Duration Sec');
+        export360Folder.add(export360Settings, 'fps', 24, 60, 1).name('FPS');
+        export360Folder.add(export360Settings, 'qualityMbps', 4, 30, 1).name('Quality Mbps');
+        export360Folder.add(export360Settings, 'clockwise').name('Clockwise');
+        export360Folder.add(export360Settings, 'exportVideo').name('Export 360 MP4');
         
         const fileFolder = gui.addFolder('File Management');
         fileFolder.add(fileSettings, 'svgUrl').name('SVG URL');
@@ -1004,10 +1197,12 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             { id: 'glass', index: '05', title: 'Textura Glass', meta: 'Refraccion / Vidrio', description: 'Modifica la transparencia, la refraccion y el tinte interno para llevar el logo hacia un look de vidrio o cristal liquido.', categories: ['all', 'material', 'visual'], folder: glassFolder },
             { id: 'glow', index: '06', title: 'Glow', meta: 'Luz / Halo', description: 'Controla el halo alrededor del logo para sumar presencia sin romper la limpieza del diseno. Ideal para dar volumen sutil.', categories: ['all', 'luz', 'post'], folder: glowFolder },
             { id: 'chromatic', index: '07', title: 'Cromatico', meta: 'Postproceso / Chrome', description: 'Define la separacion cromatica, el contraste y la exposicion blanca del render para darle un acabado mas editorial o mas agresivo.', categories: ['all', 'post', 'color'], folder: chromaticFolder },
-            { id: 'geometry', index: '08', title: 'Geometria', meta: 'Extrusion / Forma', description: 'Aqui decides el volumen real del logo: profundidad, bisel y la lectura general de la pieza en el espacio.', categories: ['all', 'geometria'], folder: geometryFolder },
-            { id: 'bevel', index: '09', title: 'Dinamica de Bisel', meta: 'Geometria / Flujo', description: 'Redirige el comportamiento del fluido hacia el bisel para que la materia siga el contorno de la forma con mas intencion.', categories: ['all', 'geometria', 'fluido'], folder: bevelFolder },
-            { id: 'environment', index: '10', title: 'Entorno', meta: 'Iluminacion / Textura', description: 'Permite cargar una textura de entorno para alterar reflejos, iluminacion y, si quieres, la lectura del propio material del logo.', categories: ['all', 'entorno', 'visual'], folder: environmentFolder },
-            { id: 'files', index: '11', title: 'Archivos', meta: 'Importacion / Exportacion', description: 'Gestiona el SVG, la carga de nuevos assets y la exportacion final en PNG con fondo o transparente, sin incluir la esfera ambiental.', categories: ['all', 'archivo'], folder: fileFolder }
+            { id: 'gradient-map', index: '08', title: 'Gradient Map', meta: 'Color / Mapa Tonal', description: 'Aplica un mapa de degradado al render completo, como en Photoshop: las sombras toman un color y las luces otro, mezclandose segun la luminancia.', categories: ['all', 'post', 'color'], folder: gradientMapFolder },
+            { id: 'geometry', index: '09', title: 'Geometria', meta: 'Extrusion / Forma', description: 'Aqui decides el volumen real del logo: profundidad, bisel y la lectura general de la pieza en el espacio.', categories: ['all', 'geometria'], folder: geometryFolder },
+            { id: 'bevel', index: '10', title: 'Dinamica de Bisel', meta: 'Geometria / Flujo', description: 'Redirige el comportamiento del fluido hacia el bisel para que la materia siga el contorno de la forma con mas intencion.', categories: ['all', 'geometria', 'fluido'], folder: bevelFolder },
+            { id: 'environment', index: '11', title: 'Entorno', meta: 'Iluminacion / Textura', description: 'Permite cargar una textura de entorno para alterar reflejos, iluminacion y, si quieres, la lectura del propio material del logo.', categories: ['all', 'entorno', 'visual'], folder: environmentFolder },
+            { id: 'export-360', index: '12', title: 'Export 360', meta: 'Video / Rotacion', description: 'Exporta una vuelta completa de 360 grados del logo sobre su eje vertical. El navegador intentara descargar MP4 y usara WebM si MP4 no esta disponible.', categories: ['all', 'archivo'], folder: export360Folder },
+            { id: 'files', index: '13', title: 'Archivos', meta: 'Importacion / Exportacion', description: 'Gestiona el SVG, la carga de nuevos assets y la exportacion final en PNG con fondo o transparente, sin incluir la esfera ambiental.', categories: ['all', 'archivo'], folder: fileFolder }
         ];
 
         const hudFilterCatalog = [
@@ -1181,6 +1376,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         applyGlassState();
         applyGlowState();
         applyChromaticState();
+        applyGradientMapState();
 
         // --- ANIMATION LOOP ---
         const clock = new THREE.Clock();
@@ -1189,6 +1385,16 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             requestAnimationFrame(animate);
             controls.update();
             liquidMaterial.userData.uTime.value = clock.getElapsedTime();
+
+            if (export360State.active) {
+                const elapsed = performance.now() - export360State.startTime;
+                const progress = Math.min(elapsed / export360State.durationMs, 1);
+                const direction = export360State.clockwise ? 1 : -1;
+                svgGroup.rotation.y = export360State.initialRotationY + direction * progress * Math.PI * 2;
+            }
+
+            renderer.setClearColor(0x000000, 1);
+            renderer.clear(true, true, true);
             composer.render();
         }
 

@@ -1,4 +1,18 @@
-@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap");
+@font-face {
+    font-family: "Inter Variable";
+    src: url("./InterVariable.ttf") format("truetype");
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Inter Variable";
+    src: url("./InterVariable-Italic.ttf") format("truetype");
+    font-weight: 100 900;
+    font-style: italic;
+    font-display: swap;
+}
 
 :root {
     --bg: #0b0b0b;
@@ -28,6 +42,8 @@ html,
 body {
     width: 100%;
     height: 100%;
+    min-height: 100%;
+    overscroll-behavior: none;
 }
 
 body {
@@ -35,7 +51,7 @@ body {
     overflow: hidden;
     background: #0b0b0b;
     color: var(--text);
-    font-family: "Space Grotesk", sans-serif;
+    font-family: "Inter Variable", sans-serif;
     cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 20 20'%3E%3Cpath fill='%23000' d='M2.8 2.6l4.6 11 1.8-3.8 4 3.2 1.2-1.5-4-3.1 4.1-1.4z'/%3E%3Cpath fill='none' stroke='%23fff' stroke-width='0.9' d='M2.8 2.6l4.6 11 1.8-3.8 4 3.2 1.2-1.5-4-3.1 4.1-1.4z'/%3E%3C/svg%3E") 2 2, auto;
 }
 
@@ -59,6 +75,8 @@ body > .site-footer {
     grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
     width: 100vw;
     height: 100vh;
+    max-height: 100vh;
+    overflow: hidden;
     background: rgba(10, 10, 10, 0.96);
 }
 
@@ -75,12 +93,12 @@ body > .site-footer {
 }
 
 .hud-sidebar__brand {
-    padding: 26px 30px 20px;
+    padding: 34px 22px 26px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .hud-brand__logo {
-    width: 238px;
+    width: min(330px, calc(100% - 8px));
     max-width: 100%;
     filter: invert(1);
     opacity: 0.98;
@@ -107,7 +125,7 @@ body > .site-footer {
     background: var(--chip);
     color: var(--text-soft);
     padding: 7px 12px;
-    font: 500 11px/1 "IBM Plex Mono", monospace;
+    font: 640 11px/1 "Inter Variable", sans-serif;
     letter-spacing: 0.16em;
     text-transform: uppercase;
     transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
@@ -174,7 +192,7 @@ body > .site-footer {
 .tool-card__index {
     align-self: start;
     color: var(--text-faint);
-    font: 500 11px/1 "IBM Plex Mono", monospace;
+    font: 560 11px/1 "Inter Variable", sans-serif;
     letter-spacing: 0.18em;
 }
 
@@ -193,7 +211,7 @@ body > .site-footer {
 .tool-card__meta {
     margin: 0;
     color: var(--text-faint);
-    font: 500 10px/1.35 "IBM Plex Mono", monospace;
+    font: 560 10px/1.35 "Inter Variable", sans-serif;
     letter-spacing: 0.14em;
     text-transform: uppercase;
 }
@@ -274,6 +292,8 @@ body > .site-footer {
     display: grid;
     grid-template-rows: minmax(0, 1fr) var(--info-height);
     min-width: 0;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .workbench-frame {
@@ -281,6 +301,7 @@ body > .site-footer {
     min-width: 0;
     min-height: 0;
     padding: 20px 20px 0 20px;
+    overflow: hidden;
 }
 
 .workbench-frame__inner {
@@ -298,6 +319,7 @@ body > .site-footer {
     inset: 20px;
     border: 1px solid rgba(255, 255, 255, 0.12);
     background: #000000;
+    contain: strict;
     overflow: hidden;
 }
 
@@ -305,6 +327,7 @@ body > .site-footer {
     display: block;
     width: 100%;
     height: 100%;
+    background: #000000;
 }
 
 .controls-drawer {
@@ -325,7 +348,7 @@ body > .site-footer {
     background: rgba(14, 14, 14, 0.88);
     color: rgba(255, 255, 255, 0.9);
     padding: 11px 15px;
-    font: 500 11px/1 "IBM Plex Mono", monospace;
+    font: 640 11px/1 "Inter Variable", sans-serif;
     letter-spacing: 0.18em;
     text-transform: uppercase;
 }
@@ -359,7 +382,7 @@ body > .site-footer {
 .controls-drawer__header p {
     margin: 0;
     color: var(--text-faint);
-    font: 500 10px/1 "IBM Plex Mono", monospace;
+    font: 560 10px/1 "Inter Variable", sans-serif;
     letter-spacing: 0.2em;
     text-transform: uppercase;
 }
@@ -396,14 +419,14 @@ body > .site-footer {
 .hud-info__right span {
     margin: 0;
     color: var(--text-faint);
-    font: 500 10px/1 "IBM Plex Mono", monospace;
+    font: 560 10px/1 "Inter Variable", sans-serif;
     letter-spacing: 0.2em;
     text-transform: uppercase;
 }
 
 .hud-info__left span {
     color: var(--text-soft);
-    font: 500 18px/1 "IBM Plex Mono", monospace;
+    font: 560 18px/1 "Inter Variable", sans-serif;
 }
 
 .hud-info__center {
@@ -416,7 +439,7 @@ body > .site-footer {
 
 #toolInfoMeta {
     color: var(--text-faint);
-    font: 500 11px/1.2 "IBM Plex Mono", monospace;
+    font: 560 11px/1.2 "Inter Variable", sans-serif;
     letter-spacing: 0.18em;
     text-transform: uppercase;
 }
@@ -443,7 +466,7 @@ body > .site-footer {
 
 .hud-info__right strong {
     color: rgba(255, 255, 255, 0.92);
-    font: 500 11px/1 "IBM Plex Mono", monospace;
+    font: 560 11px/1 "Inter Variable", sans-serif;
     letter-spacing: 0.18em;
 }
 
@@ -492,7 +515,7 @@ body > .site-footer {
     border: 1px solid rgba(255, 255, 255, 0.08);
     background: rgba(255, 255, 255, 0.03);
     border-radius: 18px;
-    font: 500 11px/1 "IBM Plex Mono", monospace;
+    font: 640 11px/1 "Inter Variable", sans-serif;
     letter-spacing: 0.15em;
     text-transform: uppercase;
 }
