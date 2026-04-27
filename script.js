@@ -119,18 +119,18 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 
         const glowSettings = {
             enabled: true,
-            strength: 0.14,
-            radius: 0.16,
-            threshold: 0.32
+            strength: 0.16,
+            radius: 0.11,
+            threshold: 0.47
         };
 
         const chromaticSettings = {
             enabled: true,
-            intensity: 0.0021,
-            angle: 1.48,
-            chromeLevel: 0.0,
-            contrast: 1.0,
-            whiteExposure: 1.0,
+            intensity: 0.0,
+            angle: 1.85,
+            chromeLevel: 1.84,
+            contrast: 1.07,
+            whiteExposure: 1.81,
             preset: 'balanced'
         };
 
@@ -144,6 +144,16 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
                 { id: 'midtone', label: 'Medio', color: '#808080', position: 0.5 },
                 { id: 'highlight', label: 'Luz', color: '#ffffff', position: 1.0 }
             ]
+        };
+
+        const pixelScanIntroSettings = {
+            enabled: true,
+            delay: 0.12,
+            duration: 2.45,
+            width: 0.24,
+            pixelSize: 11.0,
+            intensity: 1.25,
+            mode: 0
         };
 
         const export360Settings = {
@@ -267,6 +277,91 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         gradientMapPass.enabled = gradientMapSettings.enabled;
         composer.addPass(gradientMapPass);
 
+        const pixelScanPass = new ShaderPass({
+            uniforms: {
+                tDiffuse: { value: null },
+                uTime: { value: 0 },
+                uDelay: { value: pixelScanIntroSettings.delay },
+                uDuration: { value: pixelScanIntroSettings.duration },
+                uWidth: { value: pixelScanIntroSettings.width },
+                uPixelSize: { value: pixelScanIntroSettings.pixelSize },
+                uIntensity: { value: pixelScanIntroSettings.intensity },
+                uMode: { value: pixelScanIntroSettings.mode },
+                uResolution: { value: new THREE.Vector2(initialViewport.width, initialViewport.height) }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D tDiffuse;
+                uniform float uTime;
+                uniform float uDelay;
+                uniform float uDuration;
+                uniform float uWidth;
+                uniform float uPixelSize;
+                uniform float uIntensity;
+                uniform float uMode;
+                uniform vec2 uResolution;
+                varying vec2 vUv;
+
+                float hash(vec2 p) {
+                    p = fract(p * vec2(123.34, 456.21));
+                    p += dot(p, p + 45.32);
+                    return fract(p.x * p.y);
+                }
+
+                float scanRange(vec2 uv) {
+                    if (uMode < 0.5) {
+                        return uv.x;
+                    }
+
+                    if (uMode < 1.5) {
+                        return 1.0 - uv.y;
+                    }
+
+                    vec2 centered = uv - 0.5;
+                    centered.x *= uResolution.x / max(uResolution.y, 1.0);
+                    return length(centered) * 1.35;
+                }
+
+                void main() {
+                    vec4 base = texture2D(tDiffuse, vUv);
+                    float progress = clamp((uTime - uDelay) / max(uDuration, 0.001), 0.0, 1.0);
+
+                    if (progress >= 0.995) {
+                        gl_FragColor = base;
+                        return;
+                    }
+
+                    float luma = dot(base.rgb, vec3(0.299, 0.587, 0.114));
+                    float subjectMask = smoothstep(0.025, 0.16, luma);
+                    vec2 cell = floor(vUv * uResolution / max(uPixelSize, 1.0));
+                    float rnd = hash(cell);
+                    float range = scanRange(vUv);
+                    float jitter = (rnd - 0.5) * uWidth * 0.92;
+
+                    float reveal = 1.0 - smoothstep(progress - uWidth, progress + 0.035, range + jitter);
+                    reveal *= subjectMask;
+
+                    float scanCore = 1.0 - smoothstep(0.0, uWidth, abs(range + jitter - progress));
+                    float cellBlink = smoothstep(0.42, 0.98, hash(cell + floor(uTime * 18.0)));
+                    float pixelEdge = scanCore * subjectMask * (0.55 + rnd * 0.7);
+
+                    vec3 pixelColor = mix(vec3(0.78), vec3(1.0), cellBlink);
+                    vec3 color = base.rgb * reveal;
+                    color += pixelColor * pixelEdge * uIntensity * (1.0 - reveal * 0.35);
+
+                    gl_FragColor = vec4(color, base.a);
+                }
+            `
+        });
+        pixelScanPass.enabled = pixelScanIntroSettings.enabled;
+        composer.addPass(pixelScanPass);
+
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
@@ -291,22 +386,22 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 
         const liquidMaterial = new THREE.MeshPhysicalMaterial({
             color: 0xeeeeee,       
-            metalness: 0.18,
-            roughness: 0.18,       
-            clearcoat: 0.42,        
+            metalness: 0.855,
+            roughness: 0.369,       
+            clearcoat: 0.418,        
             clearcoatRoughness: 0.03,
-            iridescence: 0.28,      
-            iridescenceIOR: 1.08,   
-            iridescenceThicknessRange: [420, 560], 
+            iridescence: 0.237,      
+            iridescenceIOR: 1.82,   
+            iridescenceThicknessRange: [183, 886.5], 
             iridescenceThicknessMap: dummyTex,
-            transmission: 0.72,
-            thickness: 2.4,
-            ior: 1.42,
-            reflectivity: 0.72,
-            envMapIntensity: 1.35,
+            transmission: 0.46,
+            thickness: 3.56,
+            ior: 2.2,
+            reflectivity: 0.59,
+            envMapIntensity: 0.0,
             specularIntensity: 1.0,
-            attenuationDistance: 0.65,
-            attenuationColor: new THREE.Color('#d3d6eb'),
+            attenuationDistance: 0.93,
+            attenuationColor: new THREE.Color('#e8fafd'),
             dithering: true // CRITICAL FIX: Eliminates 8-bit color banding/staircasing in subtle gradients!
         });
 
@@ -319,14 +414,14 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         };
 
         const glassSettings = {
-            enabled: true,
+            enabled: false,
             transmission: liquidMaterial.transmission,
             thickness: liquidMaterial.thickness,
             ior: liquidMaterial.ior,
             reflectivity: liquidMaterial.reflectivity,
             envMapIntensity: liquidMaterial.envMapIntensity,
             attenuationDistance: liquidMaterial.attenuationDistance,
-            attenuationColor: '#d3d6eb'
+            attenuationColor: '#e8fafd'
         };
 
         const bevelSettings = {
@@ -334,14 +429,14 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             bevelSize: 2.5,
             bevelThickness: 2.5,
             bevelSegments: 96,
-            bevelFlowInfluence: 1.0
+            bevelFlowInfluence: 1.17
         };
 
         const environmentTextureSettings = {
             enabled: false,
             affectLogo: false,
-            affectBackground: false,
-            envIntensity: liquidMaterial.envMapIntensity,
+            affectBackground: true,
+            envIntensity: 1.51,
             uploadTexture: () => { textureInput.click(); },
             clearTexture: () => {
                 if (uploadedEnvironmentTexture) {
@@ -380,7 +475,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
                 scene.background = new THREE.Color(sceneSettings.bgColor);
             }
 
-            liquidMaterial.envMapIntensity = environmentTextureSettings.envIntensity;
+            liquidMaterial.envMapIntensity = glassSettings.enabled
+                ? glassSettings.envMapIntensity
+                : environmentTextureSettings.envIntensity;
 
             if (environmentTextureSettings.enabled && environmentTextureSettings.affectLogo && uploadedEnvironmentTexture) {
                 liquidMaterial.map = uploadedEnvironmentTexture;
@@ -413,14 +510,20 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         liquidMaterial.userData = {
             uTime: { value: 0 },
             uSpeed: { value: 0.0 },         
-            uScale: { value: 0.00298 },       
-            uDistortion: { value: 0.68 },    
-            uEdgeProtection: { value: 1.0 }, 
-            uShapeReactivity: { value: 0.42 },
+            uScale: { value: 0.0001 },       
+            uDistortion: { value: 0.485 },    
+            uEdgeProtection: { value: 0.138 }, 
+            uShapeReactivity: { value: 0.32 },
             uBevelFlowMix: { value: 0.0 },
             uShapeMask: { value: dummyTex },
             uShapeBounds: { value: new THREE.Vector4(0,0,1,1) }
         };
+
+        const fluidPlaybackSettings = {
+            paused: false,
+            frame: 0.0
+        };
+        let fluidRenderTime = 0.0;
 
         liquidMaterial.onBeforeCompile = (shader) => {
             shader.uniforms.uTime = liquidMaterial.userData.uTime;
@@ -601,7 +704,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 
         // --- SVG HANDLING ---
         const geometrySettings = {
-            depth: 100.0,
+            depth: 200.0,
             bevelEnabled: true,
             bevelSegments: bevelSettings.bevelSegments,
             steps: 2,
@@ -935,9 +1038,13 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
                 liquidMaterial.attenuationDistance = glassSettings.attenuationDistance;
                 liquidMaterial.attenuationColor.set(glassSettings.attenuationColor);
             } else {
+                applyChromeLevel();
+                applyEnvironmentTextureState();
                 liquidMaterial.transmission = 0.0;
                 liquidMaterial.thickness = 0.0;
                 liquidMaterial.attenuationDistance = 1000;
+                liquidMaterial.ior = 1.5;
+                liquidMaterial.attenuationColor.set('#ffffff');
             }
             liquidMaterial.needsUpdate = true;
         }
@@ -951,6 +1058,106 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
                 : baseMaterialSnapshot.envMapIntensity + chromeBoost * 0.55;
             liquidMaterial.clearcoat = Math.min(1, baseMaterialSnapshot.clearcoat + chromeBoost * 0.18);
             liquidMaterial.iridescence = Math.min(1, baseMaterialSnapshot.iridescence + chromeBoost * 0.16);
+        }
+
+        const communityPresets = {
+            'deushima-v1': {
+                name: 'Deushima v1',
+                scene: { bgColor: '#000000' },
+                fluid: { scale: 0.00298, shapeReactivity: 0.42, distortion: 0.68, edgeProtection: 1.0 },
+                iridescence: { intensity: 0.28, ior: 1.08, thicknessMin: 420, thicknessMax: 560 },
+                material: { roughness: 0.18, metalness: 0.18, clearcoat: 0.42 },
+                glass: {
+                    enabled: true,
+                    transmission: 0.72,
+                    thickness: 2.4,
+                    ior: 1.42,
+                    reflectivity: 0.72,
+                    envMapIntensity: 1.35,
+                    attenuationDistance: 0.65,
+                    attenuationColor: '#d3d6eb'
+                },
+                glow: { enabled: true, strength: 0.14, radius: 0.16, threshold: 0.32 },
+                chromatic: { enabled: true, intensity: 0.0021, angle: 1.48, chromeLevel: 0.0, contrast: 1.0, whiteExposure: 1.0, preset: 'balanced' },
+                geometry: { depth: 100.0, bevelSize: 2.5, bevelThickness: 2.5, bevelSegments: 96 },
+                bevel: { enableBevelDynamics: false, bevelFlowInfluence: 1.0 },
+                environment: { enabled: false, affectLogo: false, affectBackground: false, envIntensity: 1.35 }
+            }
+        };
+
+        const communityPresetSettings = {
+            current: 'Captura inicial',
+            applyDeushimaV1: () => { applyCommunityPreset('deushima-v1'); }
+        };
+
+        function updateBaseMaterialSnapshotFromCurrent() {
+            baseMaterialSnapshot.metalness = liquidMaterial.metalness;
+            baseMaterialSnapshot.reflectivity = glassSettings.reflectivity;
+            baseMaterialSnapshot.envMapIntensity = glassSettings.envMapIntensity;
+            baseMaterialSnapshot.clearcoat = liquidMaterial.clearcoat;
+            baseMaterialSnapshot.iridescence = liquidMaterial.iridescence;
+        }
+
+        function refreshGuiControllers() {
+            if (!gui) return;
+            const refreshFolder = (folder) => {
+                for (const controller of folder.controllers || []) {
+                    controller.updateDisplay();
+                }
+                const childFolders = Array.isArray(folder.folders) ? folder.folders : Object.values(folder.folders || {});
+                for (const childFolder of childFolders) {
+                    refreshFolder(childFolder);
+                }
+            };
+            refreshFolder(gui);
+        }
+
+        function applyCommunityPreset(presetId) {
+            const preset = communityPresets[presetId];
+            if (!preset) return;
+
+            sceneSettings.bgColor = preset.scene.bgColor;
+            scene.background = new THREE.Color(sceneSettings.bgColor);
+
+            liquidMaterial.userData.uScale.value = preset.fluid.scale;
+            liquidMaterial.userData.uShapeReactivity.value = preset.fluid.shapeReactivity;
+            liquidMaterial.userData.uDistortion.value = preset.fluid.distortion;
+            liquidMaterial.userData.uEdgeProtection.value = preset.fluid.edgeProtection;
+
+            liquidMaterial.iridescence = preset.iridescence.intensity;
+            liquidMaterial.iridescenceIOR = preset.iridescence.ior;
+            liquidMaterial.iridescenceThicknessRange[0] = preset.iridescence.thicknessMin;
+            liquidMaterial.iridescenceThicknessRange[1] = preset.iridescence.thicknessMax;
+            if (typeof thicknessProxy !== 'undefined') {
+                thicknessProxy.min = preset.iridescence.thicknessMin;
+                thicknessProxy.max = preset.iridescence.thicknessMax;
+            }
+
+            liquidMaterial.roughness = preset.material.roughness;
+            liquidMaterial.metalness = preset.material.metalness;
+            liquidMaterial.clearcoat = preset.material.clearcoat;
+
+            Object.assign(glassSettings, preset.glass);
+            Object.assign(glowSettings, preset.glow);
+            Object.assign(chromaticSettings, preset.chromatic);
+            Object.assign(bevelSettings, preset.bevel);
+            Object.assign(environmentTextureSettings, preset.environment);
+
+            geometrySettings.depth = preset.geometry.depth;
+            bevelSettings.bevelSize = preset.geometry.bevelSize;
+            bevelSettings.bevelThickness = preset.geometry.bevelThickness;
+            bevelSettings.bevelSegments = preset.geometry.bevelSegments;
+            liquidMaterial.userData.uBevelFlowMix.value = bevelSettings.enableBevelDynamics ? bevelSettings.bevelFlowInfluence : 0.0;
+
+            updateBaseMaterialSnapshotFromCurrent();
+            applyChromeLevel();
+            applyGlassState();
+            applyGlowState();
+            applyChromaticState();
+            applyEnvironmentTextureState();
+            rebuildCurrentSVG();
+            communityPresetSettings.current = preset.name;
+            refreshGuiControllers();
         }
 
         function rebuildCurrentSVG() {
@@ -1069,6 +1276,18 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         });
 
         const effectFolder = gui.addFolder('Fluid Dynamics');
+        effectFolder.add(fluidPlaybackSettings, 'paused').name('Pause Fluid').onChange((paused) => {
+            if (paused) {
+                fluidPlaybackSettings.frame = fluidRenderTime;
+                fluidFrameController.updateDisplay();
+            }
+        });
+        const fluidFrameController = effectFolder.add(fluidPlaybackSettings, 'frame', 0.0, 30.0, 0.01).name('Fluid Frame').onChange((value) => {
+            if (fluidPlaybackSettings.paused) {
+                fluidRenderTime = value;
+                liquidMaterial.userData.uTime.value = value;
+            }
+        });
         effectFolder.add(liquidMaterial.userData.uScale, 'value', 0.0001, 0.015).name('Ripple Scale');
         effectFolder.add(liquidMaterial.userData.uShapeReactivity, 'value', 0.0, 5.0).name('Shape Reactivity');
         effectFolder.add(liquidMaterial.userData.uDistortion, 'value', 0.0, 5.0).name('Distortion');
@@ -1078,7 +1297,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         iridescenceFolder.add(liquidMaterial, 'iridescence', 0.0, 1.0).name('Intensity');
         iridescenceFolder.add(liquidMaterial, 'iridescenceIOR', 1.0, 3.0).name('Index of Refraction');
         
-        const thicknessProxy = { min: 420, max: 560 };
+        const thicknessProxy = { min: 183, max: 886.5 };
         iridescenceFolder.add(thicknessProxy, 'min', 0, 1500).name('Thickness Min').onChange(v => {
             liquidMaterial.iridescenceThicknessRange[0] = v;
         });
@@ -1096,25 +1315,25 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             applyGlassState();
         });
         glassFolder.add(glassSettings, 'transmission', 0.0, 1.0, 0.01).name('Transmission').onChange(v => {
-            liquidMaterial.transmission = v;
+            if (glassSettings.enabled) applyGlassState();
         });
         glassFolder.add(glassSettings, 'thickness', 0.0, 8.0, 0.01).name('Glass Thickness').onChange(v => {
-            liquidMaterial.thickness = v;
+            if (glassSettings.enabled) applyGlassState();
         });
         glassFolder.add(glassSettings, 'ior', 1.0, 2.5, 0.01).name('Glass IOR').onChange(v => {
-            liquidMaterial.ior = v;
+            if (glassSettings.enabled) applyGlassState();
         });
         glassFolder.add(glassSettings, 'reflectivity', 0.0, 1.0, 0.01).name('Reflectivity').onChange(v => {
-            liquidMaterial.reflectivity = v;
+            if (glassSettings.enabled) applyGlassState();
         });
         glassFolder.add(glassSettings, 'envMapIntensity', 0.0, 3.0, 0.01).name('Env Reflection').onChange(v => {
-            liquidMaterial.envMapIntensity = v;
+            if (glassSettings.enabled) applyGlassState();
         });
         glassFolder.add(glassSettings, 'attenuationDistance', 0.0, 3.0, 0.01).name('Tint Distance').onChange(v => {
-            liquidMaterial.attenuationDistance = v;
+            if (glassSettings.enabled) applyGlassState();
         });
         glassFolder.addColor(glassSettings, 'attenuationColor').name('Glass Tint').onChange(v => {
-            liquidMaterial.attenuationColor.set(v);
+            if (glassSettings.enabled) applyGlassState();
         });
 
         const glowFolder = gui.addFolder('Glow');
@@ -1143,6 +1362,11 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         });
         chromaticFolder.add(chromaticSettings, 'chromeLevel', 0.0, 2.0, 0.01).name('Chrome Level').onChange(() => {
             applyChromeLevel();
+            if (glassSettings.enabled) {
+                applyGlassState();
+            } else {
+                applyEnvironmentTextureState();
+            }
         });
         chromaticFolder.add(chromaticSettings, 'contrast', 0.5, 2.0, 0.01).name('Contrast').onChange(v => {
             gradePass.uniforms.uContrast.value = v;
@@ -1230,6 +1454,11 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         export360Folder.add(export360Settings, 'qualityMbps', 4, 30, 1).name('Quality Mbps');
         export360Folder.add(export360Settings, 'clockwise').name('Clockwise');
         export360Folder.add(export360Settings, 'exportVideo').name('Export 360 MP4');
+
+        const communityFolder = gui.addFolder("Preset's de la comunidad");
+        const activePresetController = communityFolder.add(communityPresetSettings, 'current').name('Preset activo');
+        if (activePresetController.disable) activePresetController.disable();
+        communityFolder.add(communityPresetSettings, 'applyDeushimaV1').name('Deushima v1');
         
         const fileFolder = gui.addFolder('File Management');
         fileFolder.add(fileSettings, 'svgUrl').name('SVG URL');
@@ -1369,7 +1598,8 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             { id: 'bevel', index: '10', title: 'Dinamica de Bisel', meta: 'Geometria / Flujo', description: 'Redirige el comportamiento del fluido hacia el bisel para que la materia siga el contorno de la forma con mas intencion.', categories: ['all', 'geometria', 'fluido'], folder: bevelFolder },
             { id: 'environment', index: '11', title: 'Entorno', meta: 'Iluminacion / Textura', description: 'Permite cargar una textura de entorno para alterar reflejos, iluminacion y, si quieres, la lectura del propio material del logo.', categories: ['all', 'entorno', 'visual'], folder: environmentFolder },
             { id: 'export-360', index: '12', title: 'Export 360', meta: 'Video / Rotacion', description: 'Exporta una vuelta completa de 360 grados del logo sobre su eje vertical. El navegador intentara descargar MP4 y usara WebM si MP4 no esta disponible.', categories: ['all', 'archivo'], folder: export360Folder },
-            { id: 'files', index: '13', title: 'Archivos', meta: 'Importacion / Exportacion', description: 'Gestiona el SVG, la carga de nuevos assets y la exportacion final en PNG con fondo o transparente, sin incluir la esfera ambiental.', categories: ['all', 'archivo'], folder: fileFolder }
+            { id: 'community-presets', index: '13', title: "Preset's Comunidad", meta: 'Disenadores / Looks', description: 'Guarda y aplica presets creados por la comunidad. Deushima v1 conserva el look anterior para volver a el cuando quieras.', categories: ['all', 'presets', 'material', 'post'], folder: communityFolder },
+            { id: 'files', index: '14', title: 'Archivos', meta: 'Importacion / Exportacion', description: 'Gestiona el SVG, la carga de nuevos assets y la exportacion final en PNG con fondo o transparente, sin incluir la esfera ambiental.', categories: ['all', 'archivo'], folder: fileFolder }
         ];
 
         const hudFilterCatalog = [
@@ -1380,6 +1610,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             { id: 'post', label: 'Post' },
             { id: 'geometria', label: 'Geometria' },
             { id: 'entorno', label: 'Entorno' },
+            { id: 'presets', label: 'Presets' },
             { id: 'archivo', label: 'Archivo' }
         ];
 
@@ -1544,6 +1775,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         applyGlowState();
         applyChromaticState();
         applyGradientMapState();
+        applyEnvironmentTextureState();
 
         // --- ANIMATION LOOP ---
         const clock = new THREE.Clock();
@@ -1551,7 +1783,21 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         function animate() {
             requestAnimationFrame(animate);
             controls.update();
-            liquidMaterial.userData.uTime.value = clock.getElapsedTime();
+            const elapsedTime = clock.getElapsedTime();
+            if (fluidPlaybackSettings.paused) {
+                fluidRenderTime = fluidPlaybackSettings.frame;
+            } else {
+                fluidRenderTime = elapsedTime % 30.0;
+                fluidPlaybackSettings.frame = fluidRenderTime;
+                fluidFrameController.updateDisplay();
+            }
+            liquidMaterial.userData.uTime.value = fluidRenderTime;
+            if (pixelScanPass.enabled) {
+                pixelScanPass.uniforms.uTime.value = elapsedTime;
+                if (elapsedTime > pixelScanIntroSettings.delay + pixelScanIntroSettings.duration + 0.35) {
+                    pixelScanPass.enabled = false;
+                }
+            }
 
             if (export360State.active) {
                 const elapsed = performance.now() - export360State.startTime;
@@ -1576,6 +1822,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             composer.setSize(width, height);
             composer.setPixelRatio(pixelRatio);
             bloomPass.setSize(width, height);
+            pixelScanPass.uniforms.uResolution.value.set(width, height);
         }
 
         window.addEventListener('resize', resizeWorkbench);
