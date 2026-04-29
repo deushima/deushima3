@@ -146,6 +146,39 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             ]
         };
 
+        const imageFilterPresets = [
+            { id: 'neutral-silver', name: 'Neutral Silver', preview: 'linear-gradient(135deg, #050505 0%, #4c4c4c 42%, #f4f4f4 100%)', shadows: '#0b0b0b', midtones: '#9a9a9a', highlights: '#ffffff', contrast: 1.04, saturation: 0.1, exposure: 1.06 },
+            { id: 'moon-chrome', name: 'Moon Chrome', preview: 'linear-gradient(135deg, #111217 0%, #b9bdc7 54%, #ffffff 100%)', shadows: '#0f1013', midtones: '#b3b7c2', highlights: '#ffffff', contrast: 1.12, saturation: 0.18, exposure: 1.08 },
+            { id: 'soft-graphite', name: 'Soft Graphite', preview: 'linear-gradient(135deg, #000000 0%, #343434 55%, #bdbdbd 100%)', shadows: '#050505', midtones: '#565656', highlights: '#cfcfcf', contrast: 0.92, saturation: 0.0, exposure: 0.96 },
+            { id: 'pastel-violet', name: 'Pastel Violet', preview: 'linear-gradient(135deg, #08070c 0%, #777990 50%, #d3d6eb 100%)', shadows: '#08070c', midtones: '#777990', highlights: '#d3d6eb', contrast: 1.05, saturation: 0.32, exposure: 1.05 },
+            { id: 'blue-steel', name: 'Blue Steel', preview: 'linear-gradient(135deg, #02050a 0%, #576982 48%, #dbe8f7 100%)', shadows: '#02050a', midtones: '#52667f', highlights: '#dbe8f7', contrast: 1.08, saturation: 0.42, exposure: 1.02 },
+            { id: 'warm-pearl', name: 'Warm Pearl', preview: 'linear-gradient(135deg, #0e0b08 0%, #8d8172 50%, #fff3dd 100%)', shadows: '#0e0b08', midtones: '#8d8172', highlights: '#fff3dd', contrast: 0.98, saturation: 0.38, exposure: 1.08 },
+            { id: 'ice-mint', name: 'Ice Mint', preview: 'linear-gradient(135deg, #02100d 0%, #74a59b 48%, #e9fff9 100%)', shadows: '#02100d', midtones: '#74a59b', highlights: '#e9fff9', contrast: 1.0, saturation: 0.46, exposure: 1.04 },
+            { id: 'noir', name: 'Noir', preview: 'linear-gradient(135deg, #000000 0%, #1d1d1d 48%, #8c8c8c 100%)', shadows: '#000000', midtones: '#2b2b2b', highlights: '#8c8c8c', contrast: 1.35, saturation: 0.0, exposure: 0.88 },
+            { id: 'high-key', name: 'High Key', preview: 'linear-gradient(135deg, #292929 0%, #d8d8d8 55%, #ffffff 100%)', shadows: '#292929', midtones: '#d8d8d8', highlights: '#ffffff', contrast: 0.84, saturation: 0.02, exposure: 1.18 },
+            { id: 'smoked-glass', name: 'Smoked Glass', preview: 'linear-gradient(135deg, #020202 0%, #454b4f 46%, #d0d7d8 100%)', shadows: '#020202', midtones: '#454b4f', highlights: '#d0d7d8', contrast: 1.18, saturation: 0.12, exposure: 0.98 },
+            { id: 'rose-ash', name: 'Rose Ash', preview: 'linear-gradient(135deg, #0a0708 0%, #8a7376 46%, #f2dede 100%)', shadows: '#0a0708', midtones: '#8a7376', highlights: '#f2dede', contrast: 1.0, saturation: 0.34, exposure: 1.02 },
+            { id: 'golden-metal', name: 'Golden Metal', preview: 'linear-gradient(135deg, #100b03 0%, #9f8753 50%, #fff1ba 100%)', shadows: '#100b03', midtones: '#9f8753', highlights: '#fff1ba', contrast: 1.09, saturation: 0.55, exposure: 1.07 },
+            { id: 'deep-emerald', name: 'Deep Emerald', preview: 'linear-gradient(135deg, #010807 0%, #24564d 48%, #b9f5e3 100%)', shadows: '#010807', midtones: '#24564d', highlights: '#b9f5e3', contrast: 1.16, saturation: 0.58, exposure: 0.98 },
+            { id: 'infrared', name: 'Infrared', preview: 'linear-gradient(135deg, #060007 0%, #6e3a68 48%, #ffd5f6 100%)', shadows: '#060007', midtones: '#6e3a68', highlights: '#ffd5f6', contrast: 1.08, saturation: 0.62, exposure: 1.0 },
+            { id: 'frosted-ink', name: 'Frosted Ink', preview: 'linear-gradient(135deg, #00030a 0%, #252d37 45%, #edf6ff 100%)', shadows: '#00030a', midtones: '#252d37', highlights: '#edf6ff', contrast: 1.24, saturation: 0.24, exposure: 1.03 },
+            { id: 'negative-lime', name: 'Negative Lime', preview: 'linear-gradient(135deg, #d9ff8a 0%, #476b5d 48%, #1b1230 100%)', shadows: '#d9ff8a', midtones: '#476b5d', highlights: '#1b1230', contrast: 1.16, saturation: 0.88, exposure: 1.0 },
+            { id: 'negative-coral', name: 'Negative Coral', preview: 'linear-gradient(135deg, #ffb199 0%, #7b6f86 46%, #102331 100%)', shadows: '#ffb199', midtones: '#7b6f86', highlights: '#102331', contrast: 1.12, saturation: 0.76, exposure: 1.02 },
+            { id: 'negative-sky', name: 'Negative Sky', preview: 'linear-gradient(135deg, #bde7ff 0%, #6f6aa8 48%, #21102b 100%)', shadows: '#bde7ff', midtones: '#6f6aa8', highlights: '#21102b', contrast: 1.1, saturation: 0.72, exposure: 1.03 },
+            { id: 'negative-sand', name: 'Negative Sand', preview: 'linear-gradient(135deg, #ffe6a6 0%, #b58d79 50%, #293144 100%)', shadows: '#ffe6a6', midtones: '#b58d79', highlights: '#293144', contrast: 1.0, saturation: 0.64, exposure: 1.04 },
+            { id: 'negative-lilac', name: 'Negative Lilac', preview: 'linear-gradient(135deg, #ead7ff 0%, #9f7fb7 47%, #263746 100%)', shadows: '#ead7ff', midtones: '#9f7fb7', highlights: '#263746', contrast: 1.08, saturation: 0.7, exposure: 1.0 },
+            { id: 'negative-mint', name: 'Negative Mint', preview: 'linear-gradient(135deg, #c4ffd8 0%, #72a0a0 46%, #382544 100%)', shadows: '#c4ffd8', midtones: '#72a0a0', highlights: '#382544', contrast: 1.05, saturation: 0.74, exposure: 1.02 },
+            { id: 'negative-rose', name: 'Negative Rose', preview: 'linear-gradient(135deg, #ffd7ea 0%, #b16882 48%, #17343a 100%)', shadows: '#ffd7ea', midtones: '#b16882', highlights: '#17343a', contrast: 1.1, saturation: 0.82, exposure: 1.01 },
+            { id: 'negative-cyan', name: 'Negative Cyan', preview: 'linear-gradient(135deg, #a9fff8 0%, #5c8aa2 45%, #351733 100%)', shadows: '#a9fff8', midtones: '#5c8aa2', highlights: '#351733', contrast: 1.14, saturation: 0.9, exposure: 1.0 }
+        ];
+
+        const imageFilterSettings = {
+            enabled: false,
+            affectBackground: false,
+            amount: 0.85,
+            selected: 'neutral-silver'
+        };
+
         const pixelScanIntroSettings = {
             enabled: true,
             delay: 0.12,
@@ -281,6 +314,66 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         });
         gradientMapPass.enabled = gradientMapSettings.enabled;
         composer.addPass(gradientMapPass);
+
+        const imageFilterPass = new ShaderPass({
+            uniforms: {
+                tDiffuse: { value: null },
+                uEnabled: { value: imageFilterSettings.enabled ? 1.0 : 0.0 },
+                uAffectBackground: { value: imageFilterSettings.affectBackground ? 1.0 : 0.0 },
+                uAmount: { value: imageFilterSettings.amount },
+                uShadowColor: { value: new THREE.Color('#0b0b0b') },
+                uMidColor: { value: new THREE.Color('#9a9a9a') },
+                uHighlightColor: { value: new THREE.Color('#ffffff') },
+                uContrast: { value: 1.0 },
+                uSaturation: { value: 0.0 },
+                uExposure: { value: 1.0 }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D tDiffuse;
+                uniform float uEnabled;
+                uniform float uAffectBackground;
+                uniform float uAmount;
+                uniform vec3 uShadowColor;
+                uniform vec3 uMidColor;
+                uniform vec3 uHighlightColor;
+                uniform float uContrast;
+                uniform float uSaturation;
+                uniform float uExposure;
+                varying vec2 vUv;
+
+                void main() {
+                    vec4 color = texture2D(tDiffuse, vUv);
+                    if (uEnabled < 0.5 || uAmount <= 0.001) {
+                        gl_FragColor = color;
+                        return;
+                    }
+
+                    float luma = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+                    vec3 grade = mix(uShadowColor, uMidColor, smoothstep(0.0, 0.58, luma));
+                    grade = mix(grade, uHighlightColor, smoothstep(0.42, 1.0, luma));
+
+                    vec3 graded = color.rgb * grade * uExposure;
+                    graded = (graded - 0.5) * uContrast + 0.5;
+                    float gray = dot(graded, vec3(0.299, 0.587, 0.114));
+                    graded = mix(vec3(gray), graded, uSaturation);
+
+                    float subjectMask = smoothstep(0.018, 0.12, luma);
+                    float filterMask = mix(subjectMask, 1.0, uAffectBackground);
+                    vec3 filtered = mix(color.rgb, clamp(graded, 0.0, 1.0), uAmount);
+                    color.rgb = mix(color.rgb, filtered, filterMask);
+                    gl_FragColor = color;
+                }
+            `
+        });
+        imageFilterPass.enabled = true;
+        composer.addPass(imageFilterPass);
 
         const pixelScanPass = new ShaderPass({
             uniforms: {
@@ -1001,6 +1094,65 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             }
         }
 
+        let imageFiltersRoot = null;
+
+        function getImageFilterPreset(presetId = imageFilterSettings.selected) {
+            return imageFilterPresets.find((preset) => preset.id === presetId) || imageFilterPresets[0];
+        }
+
+        function applyImageFilterState() {
+            const preset = getImageFilterPreset();
+            imageFilterPass.uniforms.uEnabled.value = imageFilterSettings.enabled ? 1.0 : 0.0;
+            imageFilterPass.uniforms.uAffectBackground.value = imageFilterSettings.affectBackground ? 1.0 : 0.0;
+            imageFilterPass.uniforms.uAmount.value = imageFilterSettings.amount;
+            imageFilterPass.uniforms.uShadowColor.value.set(preset.shadows);
+            imageFilterPass.uniforms.uMidColor.value.set(preset.midtones);
+            imageFilterPass.uniforms.uHighlightColor.value.set(preset.highlights);
+            imageFilterPass.uniforms.uContrast.value = preset.contrast;
+            imageFilterPass.uniforms.uSaturation.value = preset.saturation;
+            imageFilterPass.uniforms.uExposure.value = preset.exposure;
+        }
+
+        function selectImageFilterPreset(presetId) {
+            imageFilterSettings.selected = presetId;
+            imageFilterSettings.enabled = true;
+            applyImageFilterState();
+            renderImageFilterPresetsUI();
+            for (const controller of imageFiltersFolder.controllers) {
+                controller.updateDisplay();
+            }
+        }
+
+        function renderImageFilterPresetsUI() {
+            if (!imageFiltersRoot) return;
+
+            imageFiltersRoot.innerHTML = '';
+            const grid = document.createElement('div');
+            grid.className = 'image-filter-grid';
+
+            imageFilterPresets.forEach((preset) => {
+                const card = document.createElement('div');
+                card.setAttribute('role', 'button');
+                card.tabIndex = 0;
+                card.className = `image-filter-card${preset.id === imageFilterSettings.selected ? ' is-active' : ''}`;
+                card.style.setProperty('--filter-preview', preset.preview);
+                card.innerHTML = `
+                    <span class="image-filter-preview"></span>
+                    <span class="image-filter-name">${preset.name}</span>
+                `;
+                card.addEventListener('click', () => selectImageFilterPreset(preset.id));
+                card.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        selectImageFilterPreset(preset.id);
+                    }
+                });
+                grid.appendChild(card);
+            });
+
+            imageFiltersRoot.appendChild(grid);
+        }
+
         let gradientStopSerial = 0;
         let gradientStopsRoot = null;
 
@@ -1192,6 +1344,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
                 },
                 glow: { enabled: true, strength: 0.14, radius: 0.16, threshold: 0.32 },
                 chromatic: { enabled: true, intensity: 0.0021, angle: 1.48, chromeLevel: 0.0, contrast: 1.0, whiteExposure: 1.0, preset: 'balanced' },
+                imageFilter: { enabled: false, affectBackground: false, amount: 0.85, selected: 'neutral-silver' },
                 structureFill: { enabled: false, color: '#cfd2d4', strength: 0.75 },
                 geometry: { depth: 100.0, bevelSize: 2.5, bevelThickness: 2.5, bevelSegments: 96 },
                 bevel: { enableBevelDynamics: false, bevelFlowInfluence: 1.0 },
@@ -1254,6 +1407,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             Object.assign(glassSettings, preset.glass);
             Object.assign(glowSettings, preset.glow);
             Object.assign(chromaticSettings, preset.chromatic);
+            Object.assign(imageFilterSettings, preset.imageFilter || { enabled: false, affectBackground: false, amount: 0.85, selected: 'neutral-silver' });
             Object.assign(structureFillSettings, preset.structureFill || { enabled: false, color: '#cfd2d4', strength: 0.75 });
             Object.assign(bevelSettings, preset.bevel);
             Object.assign(environmentTextureSettings, preset.environment);
@@ -1270,10 +1424,193 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             applyStructureFillState();
             applyGlowState();
             applyChromaticState();
+            applyImageFilterState();
             applyEnvironmentTextureState();
             rebuildCurrentSVG();
             communityPresetSettings.current = preset.name;
+            renderImageFilterPresetsUI();
             refreshGuiControllers();
+        }
+
+        const HISTORY_LIMIT = 5;
+        const historyUndoStack = [];
+        const historyRedoStack = [];
+        let historyCurrentSnapshot = null;
+        let historyDebounce = null;
+        let isRestoringHistory = false;
+
+        function cloneStops(stops) {
+            return stops.map((stop) => ({ ...stop }));
+        }
+
+        function captureHistorySnapshot() {
+            return {
+                scene: { bgColor: sceneSettings.bgColor },
+                fluid: {
+                    paused: fluidPlaybackSettings.paused,
+                    frame: fluidPlaybackSettings.frame,
+                    scale: liquidMaterial.userData.uScale.value,
+                    shapeReactivity: liquidMaterial.userData.uShapeReactivity.value,
+                    distortion: liquidMaterial.userData.uDistortion.value,
+                    edgeProtection: liquidMaterial.userData.uEdgeProtection.value
+                },
+                material: {
+                    roughness: liquidMaterial.roughness,
+                    metalness: liquidMaterial.metalness,
+                    clearcoat: liquidMaterial.clearcoat,
+                    iridescence: liquidMaterial.iridescence,
+                    iridescenceIOR: liquidMaterial.iridescenceIOR,
+                    thicknessMin: liquidMaterial.iridescenceThicknessRange[0],
+                    thicknessMax: liquidMaterial.iridescenceThicknessRange[1]
+                },
+                baseMaterial: { ...baseMaterialSnapshot },
+                glass: { ...glassSettings },
+                glow: { ...glowSettings },
+                chromatic: { ...chromaticSettings },
+                imageFilter: { ...imageFilterSettings },
+                structureFill: { ...structureFillSettings },
+                edgeSmooth: { ...edgeSmoothSettings },
+                gradientMap: {
+                    enabled: gradientMapSettings.enabled,
+                    amount: gradientMapSettings.amount,
+                    smoothness: gradientMapSettings.smoothness,
+                    stops: cloneStops(gradientMapSettings.stops)
+                },
+                geometry: {
+                    depth: geometrySettings.depth,
+                    bevelSize: bevelSettings.bevelSize,
+                    bevelThickness: bevelSettings.bevelThickness,
+                    bevelSegments: bevelSettings.bevelSegments
+                },
+                bevel: {
+                    enableBevelDynamics: bevelSettings.enableBevelDynamics,
+                    bevelFlowInfluence: bevelSettings.bevelFlowInfluence
+                },
+                environment: {
+                    enabled: environmentTextureSettings.enabled,
+                    affectLogo: environmentTextureSettings.affectLogo,
+                    affectBackground: environmentTextureSettings.affectBackground,
+                    envIntensity: environmentTextureSettings.envIntensity
+                }
+            };
+        }
+
+        function snapshotsMatch(a, b) {
+            return JSON.stringify(a) === JSON.stringify(b);
+        }
+
+        function pushLimited(stack, snapshot) {
+            stack.push(snapshot);
+            if (stack.length > HISTORY_LIMIT) {
+                stack.shift();
+            }
+        }
+
+        function commitHistorySnapshot() {
+            if (isRestoringHistory || !historyCurrentSnapshot) return;
+            const nextSnapshot = captureHistorySnapshot();
+            if (snapshotsMatch(historyCurrentSnapshot, nextSnapshot)) return;
+
+            pushLimited(historyUndoStack, historyCurrentSnapshot);
+            historyRedoStack.length = 0;
+            historyCurrentSnapshot = nextSnapshot;
+        }
+
+        function scheduleHistoryCommit() {
+            if (isRestoringHistory) return;
+            window.clearTimeout(historyDebounce);
+            historyDebounce = window.setTimeout(commitHistorySnapshot, 260);
+        }
+
+        function flushHistoryCommit() {
+            window.clearTimeout(historyDebounce);
+            commitHistorySnapshot();
+        }
+
+        function restoreHistorySnapshot(snapshot) {
+            isRestoringHistory = true;
+
+            sceneSettings.bgColor = snapshot.scene.bgColor;
+            scene.background = new THREE.Color(sceneSettings.bgColor);
+
+            fluidPlaybackSettings.paused = snapshot.fluid.paused;
+            fluidPlaybackSettings.frame = snapshot.fluid.frame;
+            fluidRenderTime = snapshot.fluid.frame;
+            liquidMaterial.userData.uTime.value = fluidRenderTime;
+            liquidMaterial.userData.uScale.value = snapshot.fluid.scale;
+            liquidMaterial.userData.uShapeReactivity.value = snapshot.fluid.shapeReactivity;
+            liquidMaterial.userData.uDistortion.value = snapshot.fluid.distortion;
+            liquidMaterial.userData.uEdgeProtection.value = snapshot.fluid.edgeProtection;
+
+            Object.assign(baseMaterialSnapshot, snapshot.baseMaterial);
+            liquidMaterial.roughness = snapshot.material.roughness;
+            liquidMaterial.metalness = snapshot.material.metalness;
+            liquidMaterial.clearcoat = snapshot.material.clearcoat;
+            liquidMaterial.iridescence = snapshot.material.iridescence;
+            liquidMaterial.iridescenceIOR = snapshot.material.iridescenceIOR;
+            liquidMaterial.iridescenceThicknessRange[0] = snapshot.material.thicknessMin;
+            liquidMaterial.iridescenceThicknessRange[1] = snapshot.material.thicknessMax;
+            if (typeof thicknessProxy !== 'undefined') {
+                thicknessProxy.min = snapshot.material.thicknessMin;
+                thicknessProxy.max = snapshot.material.thicknessMax;
+            }
+
+            Object.assign(glassSettings, snapshot.glass);
+            Object.assign(glowSettings, snapshot.glow);
+            Object.assign(chromaticSettings, snapshot.chromatic);
+            Object.assign(imageFilterSettings, snapshot.imageFilter || { enabled: false, affectBackground: false, amount: 0.85, selected: 'neutral-silver' });
+            Object.assign(structureFillSettings, snapshot.structureFill);
+            Object.assign(edgeSmoothSettings, snapshot.edgeSmooth);
+            Object.assign(environmentTextureSettings, snapshot.environment);
+
+            gradientMapSettings.enabled = snapshot.gradientMap.enabled;
+            gradientMapSettings.amount = snapshot.gradientMap.amount;
+            gradientMapSettings.smoothness = snapshot.gradientMap.smoothness;
+            gradientMapSettings.stops = cloneStops(snapshot.gradientMap.stops);
+
+            geometrySettings.depth = snapshot.geometry.depth;
+            bevelSettings.bevelSize = snapshot.geometry.bevelSize;
+            bevelSettings.bevelThickness = snapshot.geometry.bevelThickness;
+            bevelSettings.bevelSegments = snapshot.geometry.bevelSegments;
+            bevelSettings.enableBevelDynamics = snapshot.bevel.enableBevelDynamics;
+            bevelSettings.bevelFlowInfluence = snapshot.bevel.bevelFlowInfluence;
+            liquidMaterial.userData.uBevelFlowMix.value = bevelSettings.enableBevelDynamics ? bevelSettings.bevelFlowInfluence : 0.0;
+
+            applyChromeLevel();
+            applyGlassState();
+            applyStructureFillState();
+            applyGlowState();
+            applyChromaticState();
+            applyImageFilterState();
+            applyEdgeSmoothState();
+            applyGradientMapState();
+            applyEnvironmentTextureState();
+            rebuildCurrentSVG();
+            renderGradientStopsUI();
+            renderImageFilterPresetsUI();
+            refreshGuiControllers();
+
+            isRestoringHistory = false;
+        }
+
+        function undoHistory() {
+            flushHistoryCommit();
+            if (!historyUndoStack.length) return;
+            const currentSnapshot = captureHistorySnapshot();
+            const previousSnapshot = historyUndoStack.pop();
+            pushLimited(historyRedoStack, currentSnapshot);
+            restoreHistorySnapshot(previousSnapshot);
+            historyCurrentSnapshot = captureHistorySnapshot();
+        }
+
+        function redoHistory() {
+            flushHistoryCommit();
+            if (!historyRedoStack.length) return;
+            const currentSnapshot = captureHistorySnapshot();
+            const nextSnapshot = historyRedoStack.pop();
+            pushLimited(historyUndoStack, currentSnapshot);
+            restoreHistorySnapshot(nextSnapshot);
+            historyCurrentSnapshot = captureHistorySnapshot();
         }
 
         function rebuildCurrentSVG() {
@@ -1505,6 +1842,22 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             applyChromaticPreset(v);
         });
 
+        const imageFiltersFolder = gui.addFolder('Image Filters');
+        imageFiltersFolder.add(imageFilterSettings, 'enabled').name('Enable Filters').onChange(() => {
+            applyImageFilterState();
+            renderImageFilterPresetsUI();
+        });
+        imageFiltersFolder.add(imageFilterSettings, 'affectBackground').name('Affect Background').onChange(() => {
+            applyImageFilterState();
+        });
+        imageFiltersFolder.add(imageFilterSettings, 'amount', 0.0, 1.0, 0.01).name('Filter Amount').onChange(() => {
+            applyImageFilterState();
+        });
+        imageFiltersRoot = document.createElement('div');
+        imageFiltersRoot.className = 'image-filters-ui';
+        (imageFiltersFolder.domElement.querySelector('.children') || imageFiltersFolder.domElement).appendChild(imageFiltersRoot);
+        renderImageFilterPresetsUI();
+
         const edgeSmoothFolder = gui.addFolder('Edge Smoothing');
         edgeSmoothFolder.add(edgeSmoothSettings, 'enabled').name('Enable Smoothing').onChange(() => {
             applyEdgeSmoothState();
@@ -1729,14 +2082,15 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             { id: 'glass', index: '06', title: 'Textura Glass', meta: 'Refraccion / Vidrio', description: 'Modifica la transparencia, la refraccion y el tinte interno para llevar el logo hacia un look de vidrio o cristal liquido.', categories: ['all', 'material', 'visual'], folder: glassFolder },
             { id: 'glow', index: '07', title: 'Glow', meta: 'Luz / Halo', description: 'Controla el halo alrededor del logo para sumar presencia sin romper la limpieza del diseno. Ideal para dar volumen sutil.', categories: ['all', 'luz', 'post'], folder: glowFolder },
             { id: 'chromatic', index: '08', title: 'Cromatico', meta: 'Postproceso / Chrome', description: 'Define la separacion cromatica, el contraste y la exposicion blanca del render para darle un acabado mas editorial o mas agresivo.', categories: ['all', 'post', 'color'], folder: chromaticFolder },
-            { id: 'edge-smoothing', index: '09', title: 'Suavizar Bordes', meta: 'Postproceso / Anti Alias', description: 'Activa un suavizado final sobre el render para reducir bordes pixelados sin cambiar la forma ni el material del logo.', categories: ['all', 'post', 'visual'], folder: edgeSmoothFolder },
-            { id: 'gradient-map', index: '10', title: 'Gradient Map', meta: 'Color / Mapa Tonal', description: 'Aplica un mapa de degradado al render completo, como en Photoshop: las sombras toman un color y las luces otro, mezclandose segun la luminancia.', categories: ['all', 'post', 'color'], folder: gradientMapFolder },
-            { id: 'geometry', index: '11', title: 'Geometria', meta: 'Extrusion / Forma', description: 'Aqui decides el volumen real del logo: profundidad, bisel y la lectura general de la pieza en el espacio.', categories: ['all', 'geometria'], folder: geometryFolder },
-            { id: 'bevel', index: '12', title: 'Dinamica de Bisel', meta: 'Geometria / Flujo', description: 'Redirige el comportamiento del fluido hacia el bisel para que la materia siga el contorno de la forma con mas intencion.', categories: ['all', 'geometria', 'fluido'], folder: bevelFolder },
-            { id: 'environment', index: '13', title: 'Entorno', meta: 'Iluminacion / Textura', description: 'Permite cargar una textura de entorno para alterar reflejos, iluminacion y, si quieres, la lectura del propio material del logo.', categories: ['all', 'entorno', 'visual'], folder: environmentFolder },
-            { id: 'export-360', index: '14', title: 'Export 360', meta: 'Video / Rotacion', description: 'Exporta una vuelta completa de 360 grados del logo sobre su eje vertical. El navegador intentara descargar MP4 y usara WebM si MP4 no esta disponible.', categories: ['all', 'archivo'], folder: export360Folder },
-            { id: 'community-presets', index: '15', title: "Preset's Comunidad", meta: 'Disenadores / Looks', description: 'Guarda y aplica presets creados por la comunidad. Deushima v1 conserva el look anterior para volver a el cuando quieras.', categories: ['all', 'presets', 'material', 'post'], folder: communityFolder },
-            { id: 'files', index: '16', title: 'Archivos', meta: 'Importacion / Exportacion', description: 'Gestiona el SVG, la carga de nuevos assets y la exportacion final en PNG con fondo o transparente, sin incluir la esfera ambiental.', categories: ['all', 'archivo'], folder: fileFolder }
+            { id: 'image-filters', index: '09', title: 'Filtros', meta: 'Color / Presets', description: 'Aplica filtros de imagen con mini previews de material/color. Sirve para probar acabados tonales rapidos sin alterar el material base del logo.', categories: ['all', 'post', 'visual', 'color'], folder: imageFiltersFolder },
+            { id: 'edge-smoothing', index: '10', title: 'Suavizar Bordes', meta: 'Postproceso / Anti Alias', description: 'Activa un suavizado final sobre el render para reducir bordes pixelados sin cambiar la forma ni el material del logo.', categories: ['all', 'post', 'visual'], folder: edgeSmoothFolder },
+            { id: 'gradient-map', index: '11', title: 'Gradient Map', meta: 'Color / Mapa Tonal', description: 'Aplica un mapa de degradado al render completo, como en Photoshop: las sombras toman un color y las luces otro, mezclandose segun la luminancia.', categories: ['all', 'post', 'color'], folder: gradientMapFolder },
+            { id: 'geometry', index: '12', title: 'Geometria', meta: 'Extrusion / Forma', description: 'Aqui decides el volumen real del logo: profundidad, bisel y la lectura general de la pieza en el espacio.', categories: ['all', 'geometria'], folder: geometryFolder },
+            { id: 'bevel', index: '13', title: 'Dinamica de Bisel', meta: 'Geometria / Flujo', description: 'Redirige el comportamiento del fluido hacia el bisel para que la materia siga el contorno de la forma con mas intencion.', categories: ['all', 'geometria', 'fluido'], folder: bevelFolder },
+            { id: 'environment', index: '14', title: 'Entorno', meta: 'Iluminacion / Textura', description: 'Permite cargar una textura de entorno para alterar reflejos, iluminacion y, si quieres, la lectura del propio material del logo.', categories: ['all', 'entorno', 'visual'], folder: environmentFolder },
+            { id: 'export-360', index: '15', title: 'Export 360', meta: 'Video / Rotacion', description: 'Exporta una vuelta completa de 360 grados del logo sobre su eje vertical. El navegador intentara descargar MP4 y usara WebM si MP4 no esta disponible.', categories: ['all', 'archivo'], folder: export360Folder },
+            { id: 'community-presets', index: '16', title: "Preset's Comunidad", meta: 'Disenadores / Looks', description: 'Guarda y aplica presets creados por la comunidad. Deushima v1 conserva el look anterior para volver a el cuando quieras.', categories: ['all', 'presets', 'material', 'post'], folder: communityFolder },
+            { id: 'files', index: '17', title: 'Archivos', meta: 'Importacion / Exportacion', description: 'Gestiona el SVG, la carga de nuevos assets y la exportacion final en PNG con fondo o transparente, sin incluir la esfera ambiental.', categories: ['all', 'archivo'], folder: fileFolder }
         ];
 
         const hudFilterCatalog = [
@@ -1912,9 +2266,28 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         applyStructureFillState();
         applyGlowState();
         applyChromaticState();
+        applyImageFilterState();
         applyEdgeSmoothState();
         applyGradientMapState();
         applyEnvironmentTextureState();
+        historyCurrentSnapshot = captureHistorySnapshot();
+
+        controlsPanel?.addEventListener('input', scheduleHistoryCommit, true);
+        controlsPanel?.addEventListener('change', scheduleHistoryCommit, true);
+        controlsPanel?.addEventListener('click', scheduleHistoryCommit, true);
+        controlsPanel?.addEventListener('dragend', scheduleHistoryCommit, true);
+        window.addEventListener('keydown', (event) => {
+            if (!event.ctrlKey || event.altKey || event.metaKey) return;
+
+            const key = event.key.toLowerCase();
+            if (key === 'z' && event.shiftKey) {
+                event.preventDefault();
+                redoHistory();
+            } else if (key === 'z') {
+                event.preventDefault();
+                undoHistory();
+            }
+        });
 
         // --- ANIMATION LOOP ---
         const clock = new THREE.Clock();
