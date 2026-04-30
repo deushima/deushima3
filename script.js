@@ -319,14 +319,24 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
                     float luma = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
 
                     vec3 mapped = uStopColors[0];
+                    vec3 lastColor = uStopColors[0];
+                    float lastPosition = uStopPositions[0];
+                    for (int j = 1; j < 8; j++) {
+                        if (j >= uStopCount) {
+                            break;
+                        }
+                        lastColor = uStopColors[j];
+                        lastPosition = uStopPositions[j];
+                    }
+
                     if (luma <= uStopPositions[0]) {
                         color.rgb = mix(color.rgb, uStopColors[0], uAmount);
                         gl_FragColor = color;
                         return;
                     }
 
-                    if (luma >= uStopPositions[uStopCount - 1]) {
-                        color.rgb = mix(color.rgb, uStopColors[uStopCount - 1], uAmount);
+                    if (luma >= lastPosition) {
+                        color.rgb = mix(color.rgb, lastColor, uAmount);
                         gl_FragColor = color;
                         return;
                     }
@@ -1205,6 +1215,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         let gradientStopSerial = 0;
         let gradientStopsRoot = null;
         let activeGradientDragId = null;
+        let activeInlineColorControl = null;
 
         function clamp01(value) {
             return Math.min(1, Math.max(0, value));
@@ -1235,6 +1246,192 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 
         function colorToHexString(value) {
             return `#${new THREE.Color(value).getHexString()}`;
+        }
+
+        function normalizeHexColor(value, fallback = '#ffffff') {
+            try {
+                return colorToHexString(value || fallback);
+            } catch (error) {
+                return fallback;
+            }
+        }
+
+        function hexToRgb(value) {
+            const hex = normalizeHexColor(value).slice(1);
+            return {
+                r: parseInt(hex.slice(0, 2), 16),
+                g: parseInt(hex.slice(2, 4), 16),
+                b: parseInt(hex.slice(4, 6), 16)
+            };
+        }
+
+        function rgbToHsv({ r, g, b }) {
+            const rr = r / 255;
+            const gg = g / 255;
+            const bb = b / 255;
+            const max = Math.max(rr, gg, bb);
+            const min = Math.min(rr, gg, bb);
+            const delta = max - min;
+            let h = 0;
+
+            if (delta !== 0) {
+                if (max === rr) h = ((gg - bb) / delta) % 6;
+                else if (max === gg) h = (bb - rr) / delta + 2;
+                else h = (rr - gg) / delta + 4;
+                h *= 60;
+                if (h < 0) h += 360;
+            }
+
+            return {
+                h,
+                s: max === 0 ? 0 : delta / max,
+                v: max
+            };
+        }
+
+        function hsvToHex({ h, s, v }) {
+            const c = v * s;
+            const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+            const m = v - c;
+            let rgb = [0, 0, 0];
+
+            if (h < 60) rgb = [c, x, 0];
+            else if (h < 120) rgb = [x, c, 0];
+            else if (h < 180) rgb = [0, c, x];
+            else if (h < 240) rgb = [0, x, c];
+            else if (h < 300) rgb = [x, 0, c];
+            else rgb = [c, 0, x];
+
+            return `#${rgb.map((channel) => Math.round((channel + m) * 255).toString(16).padStart(2, '0')).join('')}`;
+        }
+
+        function setColorInputValue(input, color, eventType = 'input') {
+            input.value = normalizeHexColor(color);
+            input.dispatchEvent(new Event(eventType, { bubbles: true }));
+        }
+
+        function closeInlineColorPicker() {
+            if (!activeInlineColorControl) return;
+            activeInlineColorControl.root.classList.remove('is-open');
+            activeInlineColorControl.panel.hidden = true;
+            activeInlineColorControl = null;
+        }
+
+        function syncInlineColorControl(control, color = control.input.value) {
+            const hex = normalizeHexColor(color);
+            const hsv = rgbToHsv(hexToRgb(hex));
+            control.swatch.style.background = hex;
+            control.hex.value = hex.toUpperCase();
+            control.hue.value = Math.round(hsv.h);
+            control.sv.style.setProperty('--picker-hue', `hsl(${hsv.h}, 100%, 50%)`);
+            control.svHandle.style.left = `${hsv.s * 100}%`;
+            control.svHandle.style.top = `${(1 - hsv.v) * 100}%`;
+        }
+
+        function createInlineColorControl(input) {
+            if (input.dataset.inlineColorEnhanced === 'true') return null;
+            input.dataset.inlineColorEnhanced = 'true';
+            input.tabIndex = -1;
+
+            const root = document.createElement('div');
+            root.className = 'inline-color-control';
+            root.innerHTML = `
+                <button type="button" class="inline-color-button" title="Editar color">
+                    <span class="inline-color-swatch"></span>
+                    <span class="inline-color-value"></span>
+                </button>
+                <div class="inline-color-panel" hidden>
+                    <div class="inline-color-sv"><span class="inline-color-sv-handle"></span></div>
+                    <input class="inline-color-hue" type="range" min="0" max="360" step="1" value="0">
+                    <input class="inline-color-hex" type="text" maxlength="7" spellcheck="false">
+                </div>
+            `;
+
+            input.insertAdjacentElement('afterend', root);
+            root.appendChild(input);
+
+            const control = {
+                input,
+                root,
+                button: root.querySelector('.inline-color-button'),
+                swatch: root.querySelector('.inline-color-swatch'),
+                value: root.querySelector('.inline-color-value'),
+                panel: root.querySelector('.inline-color-panel'),
+                sv: root.querySelector('.inline-color-sv'),
+                svHandle: root.querySelector('.inline-color-sv-handle'),
+                hue: root.querySelector('.inline-color-hue'),
+                hex: root.querySelector('.inline-color-hex')
+            };
+
+            control.value.textContent = normalizeHexColor(input.value).toUpperCase();
+
+            const applyFromHsv = (hsv) => {
+                const hex = hsvToHex(hsv);
+                control.value.textContent = hex.toUpperCase();
+                syncInlineColorControl(control, hex);
+                setColorInputValue(input, hex);
+            };
+
+            const readCurrentHsv = () => rgbToHsv(hexToRgb(input.value));
+
+            control.button.addEventListener('click', (event) => {
+                event.stopPropagation();
+                if (activeInlineColorControl && activeInlineColorControl !== control) closeInlineColorPicker();
+                activeInlineColorControl = control;
+                control.root.classList.toggle('is-open');
+                control.panel.hidden = !control.root.classList.contains('is-open');
+                if (!control.panel.hidden) syncInlineColorControl(control);
+            });
+
+            control.hue.addEventListener('input', () => {
+                const hsv = readCurrentHsv();
+                hsv.h = Number(control.hue.value);
+                applyFromHsv(hsv);
+            });
+
+            control.hex.addEventListener('input', () => {
+                if (!/^#[0-9a-fA-F]{6}$/.test(control.hex.value)) return;
+                const hex = normalizeHexColor(control.hex.value);
+                control.value.textContent = hex.toUpperCase();
+                syncInlineColorControl(control, hex);
+                setColorInputValue(input, hex);
+            });
+
+            const pickSaturationValue = (event) => {
+                const rect = control.sv.getBoundingClientRect();
+                const hsv = readCurrentHsv();
+                hsv.s = clamp01((event.clientX - rect.left) / Math.max(rect.width, 1));
+                hsv.v = 1 - clamp01((event.clientY - rect.top) / Math.max(rect.height, 1));
+                applyFromHsv(hsv);
+            };
+
+            control.sv.addEventListener('pointerdown', (event) => {
+                event.preventDefault();
+                pickSaturationValue(event);
+                control.sv.setPointerCapture(event.pointerId);
+                const onMove = (moveEvent) => pickSaturationValue(moveEvent);
+                const onUp = () => {
+                    control.sv.removeEventListener('pointermove', onMove);
+                    control.sv.removeEventListener('pointerup', onUp);
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                };
+                control.sv.addEventListener('pointermove', onMove);
+                control.sv.addEventListener('pointerup', onUp);
+            });
+
+            input.addEventListener('input', () => {
+                const hex = normalizeHexColor(input.value);
+                control.value.textContent = hex.toUpperCase();
+                syncInlineColorControl(control, hex);
+            });
+
+            syncInlineColorControl(control);
+            return control;
+        }
+
+        function enhanceInlineColorInputs(scope = controlsPanel) {
+            scope?.querySelectorAll?.('input[type="color"]:not([data-inline-color-enhanced="true"])')
+                .forEach((input) => createInlineColorControl(input));
         }
 
         function sampleGradientColorAt(position) {
@@ -1296,20 +1493,49 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             applyGradientMapState();
         }
 
-        function updateGradientStopPosition(stopId, position) {
+        function syncGradientEditorDom() {
+            if (!gradientStopsRoot) return;
+            const selectedStop = ensureGradientSelection();
+            const previewBar = gradientStopsRoot.querySelector('.gradient-editor__bar');
+            if (previewBar) previewBar.style.background = buildGradientPreviewCss();
+
+            getOrderedGradientStops().forEach((stop) => {
+                const stopButton = gradientStopsRoot.querySelector(`[data-gradient-stop="${stop.id}"]`);
+                if (stopButton) {
+                    stopButton.style.left = `${stop.position * 100}%`;
+                    stopButton.style.setProperty('--stop-color', stop.color);
+                    stopButton.classList.toggle('is-active', selectedStop?.id === stop.id);
+                    stopButton.title = `${formatGradientPercent(stop.position)} - ${stop.color}`;
+                }
+            });
+
+            const selectedNumber = gradientStopsRoot.querySelector('.gradient-editor__number');
+            const selectedColor = gradientStopsRoot.querySelector('.gradient-editor__color');
+            if (selectedStop && selectedNumber && document.activeElement !== selectedNumber) {
+                selectedNumber.value = Math.round(selectedStop.position * 100);
+            }
+            if (selectedStop && selectedColor && selectedColor.value !== selectedStop.color) {
+                selectedColor.value = selectedStop.color;
+                selectedColor.dispatchEvent(new Event('input', { bubbles: false }));
+            }
+        }
+
+        function updateGradientStopPosition(stopId, position, { render = true } = {}) {
             const stop = getGradientStopById(stopId);
             if (!stop) return;
             stop.position = clamp01(position);
-            renderGradientStopsUI();
             applyGradientMapState();
+            if (render) renderGradientStopsUI();
+            else syncGradientEditorDom();
         }
 
-        function updateGradientStopColor(stopId, color) {
+        function updateGradientStopColor(stopId, color, { render = true } = {}) {
             const stop = getGradientStopById(stopId);
             if (!stop) return;
             stop.color = colorToHexString(color);
-            renderGradientStopsUI();
             applyGradientMapState();
+            if (render) renderGradientStopsUI();
+            else syncGradientEditorDom();
         }
 
         function renderGradientStopsUI() {
@@ -1347,6 +1573,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
                 const stopButton = document.createElement('button');
                 stopButton.type = 'button';
                 stopButton.className = `gradient-editor__stop${selectedStop?.id === stop.id ? ' is-active' : ''}`;
+                stopButton.dataset.gradientStop = stop.id;
                 stopButton.style.left = `${stop.position * 100}%`;
                 stopButton.style.setProperty('--stop-color', stop.color);
                 stopButton.title = `${formatGradientPercent(stop.position)} - ${stop.color}`;
@@ -1375,7 +1602,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
                     <div class="gradient-editor__selected-controls">
                         <label class="gradient-editor__field">
                             <span>Color</span>
-                            <input class="gradient-editor__color" type="color" value="${selectedStop.color}">
+                            <input class="gradient-editor__color" type="color" value="${selectedStop.color}" data-inline-color-compact="true">
                         </label>
                         <label class="gradient-editor__field gradient-editor__field--position">
                             <span>Ubicacion</span>
@@ -1389,7 +1616,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
                 `;
 
                 selectedPanel.querySelector('.gradient-editor__color').addEventListener('input', (event) => {
-                    updateGradientStopColor(selectedStop.id, event.target.value);
+                    updateGradientStopColor(selectedStop.id, event.target.value, { render: false });
                 });
                 selectedPanel.querySelector('.gradient-editor__number').addEventListener('input', (event) => {
                     updateGradientStopPosition(selectedStop.id, Number(event.target.value) / 100);
@@ -1431,6 +1658,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 
             editor.appendChild(list);
             gradientStopsRoot.appendChild(editor);
+            enhanceInlineColorInputs(gradientStopsRoot);
         }
 
         window.addEventListener('pointermove', (event) => {
@@ -1438,7 +1666,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             const previewBar = gradientStopsRoot.querySelector('.gradient-editor__bar');
             if (!previewBar) return;
             const rect = previewBar.getBoundingClientRect();
-            updateGradientStopPosition(activeGradientDragId, (event.clientX - rect.left) / Math.max(rect.width, 1));
+            updateGradientStopPosition(activeGradientDragId, (event.clientX - rect.left) / Math.max(rect.width, 1), { render: false });
         });
 
         window.addEventListener('pointerup', () => {
@@ -2120,7 +2348,14 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 
         if (controlsPanel) {
             controlsPanel.appendChild(gui.domElement);
+            enhanceInlineColorInputs(controlsPanel);
         }
+
+        document.addEventListener('click', (event) => {
+            if (activeInlineColorControl && !activeInlineColorControl.root.contains(event.target)) {
+                closeInlineColorPicker();
+            }
+        });
 
         const toolCatalog = [
             {
