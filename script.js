@@ -165,7 +165,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             enabled: false,
             amount: 1.0,
             smoothness: 1.0,
-            addStop: () => { addGradientStop(); },
+            selectedStopId: 'midtone',
             stops: [
                 { id: 'shadow', label: 'Sombra', color: '#000000', position: 0.0 },
                 { id: 'midtone', label: 'Medio', color: '#808080', position: 0.5 },
@@ -316,9 +316,21 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 
                 void main() {
                     vec4 color = texture2D(tDiffuse, vUv);
-                    float luma = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+                    float luma = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
 
                     vec3 mapped = uStopColors[0];
+                    if (luma <= uStopPositions[0]) {
+                        color.rgb = mix(color.rgb, uStopColors[0], uAmount);
+                        gl_FragColor = color;
+                        return;
+                    }
+
+                    if (luma >= uStopPositions[uStopCount - 1]) {
+                        color.rgb = mix(color.rgb, uStopColors[uStopCount - 1], uAmount);
+                        gl_FragColor = color;
+                        return;
+                    }
+
                     for (int i = 0; i < 7; i++) {
                         if (i >= uStopCount - 1) {
                             break;
@@ -326,11 +338,12 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 
                         float left = uStopPositions[i];
                         float right = max(uStopPositions[i + 1], left + 0.0001);
-                        float t = clamp((luma - left) / (right - left), 0.0, 1.0);
-                        t = mix(step(0.5, t), smoothstep(0.0, 1.0, t), uSmoothness);
-
-                        if (luma >= left) {
-                            mapped = mix(uStopColors[i], uStopColors[i + 1], t);
+                        if (luma >= left && luma <= right) {
+                            float localT = clamp((luma - left) / (right - left), 0.0, 1.0);
+                            float smoothT = localT * localT * (3.0 - 2.0 * localT);
+                            float finalT = mix(localT, smoothT, uSmoothness);
+                            mapped = mix(uStopColors[i], uStopColors[i + 1], finalT);
+                            break;
                         }
                     }
 
@@ -1116,9 +1129,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         }
 
         function applyGradientMapState() {
-            const orderedStops = [...gradientMapSettings.stops]
-                .sort((a, b) => a.position - b.position)
-                .slice(0, 8);
+            const orderedStops = getOrderedGradientStops();
 
             gradientMapPass.enabled = gradientMapSettings.enabled;
             gradientMapPass.uniforms.uAmount.value = gradientMapSettings.amount;
@@ -1193,37 +1204,85 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 
         let gradientStopSerial = 0;
         let gradientStopsRoot = null;
+        let activeGradientDragId = null;
 
         function clamp01(value) {
             return Math.min(1, Math.max(0, value));
         }
 
-        function rebalanceGradientStopsByOrder() {
-            const count = gradientMapSettings.stops.length;
-            if (count <= 1) {
-                gradientMapSettings.stops[0].position = 0.5;
-                return;
-            }
-
-            gradientMapSettings.stops.forEach((stop, index) => {
-                stop.position = index / (count - 1);
-            });
+        function getOrderedGradientStops() {
+            return [...gradientMapSettings.stops]
+                .sort((a, b) => a.position - b.position)
+                .slice(0, 8);
         }
 
-        function addGradientStop() {
+        function getGradientStopById(stopId = gradientMapSettings.selectedStopId) {
+            return gradientMapSettings.stops.find((stop) => stop.id === stopId) || null;
+        }
+
+        function ensureGradientSelection() {
+            const selectedStop = getGradientStopById();
+            if (selectedStop) return selectedStop;
+
+            const fallbackStop = getOrderedGradientStops()[0] || null;
+            gradientMapSettings.selectedStopId = fallbackStop?.id || null;
+            return fallbackStop;
+        }
+
+        function formatGradientPercent(position) {
+            return `${Math.round(clamp01(position) * 100)}%`;
+        }
+
+        function colorToHexString(value) {
+            return `#${new THREE.Color(value).getHexString()}`;
+        }
+
+        function sampleGradientColorAt(position) {
+            const orderedStops = getOrderedGradientStops();
+            const clampedPosition = clamp01(position);
+            if (!orderedStops.length) return '#ffffff';
+            if (clampedPosition <= orderedStops[0].position) return colorToHexString(orderedStops[0].color);
+            if (clampedPosition >= orderedStops[orderedStops.length - 1].position) return colorToHexString(orderedStops[orderedStops.length - 1].color);
+
+            for (let index = 0; index < orderedStops.length - 1; index += 1) {
+                const left = orderedStops[index];
+                const right = orderedStops[index + 1];
+                if (clampedPosition < left.position || clampedPosition > right.position) continue;
+
+                const localT = clamp01((clampedPosition - left.position) / Math.max(right.position - left.position, 0.0001));
+                const smoothT = localT * localT * (3 - 2 * localT);
+                const finalT = THREE.MathUtils.lerp(localT, smoothT, gradientMapSettings.smoothness);
+                const leftColor = new THREE.Color(left.color);
+                const rightColor = new THREE.Color(right.color);
+                return `#${leftColor.lerp(rightColor, finalT).getHexString()}`;
+            }
+
+            return colorToHexString(orderedStops[orderedStops.length - 1].color);
+        }
+
+        function buildGradientPreviewCss() {
+            return `linear-gradient(90deg, ${getOrderedGradientStops().map((stop) => `${stop.color} ${Math.round(stop.position * 100)}%`).join(', ')})`;
+        }
+
+        function selectGradientStop(stopId) {
+            gradientMapSettings.selectedStopId = stopId;
+            renderGradientStopsUI();
+        }
+
+        function addGradientStop(position = 0.5) {
             if (gradientMapSettings.stops.length >= 8) {
                 alert('Gradient Map permite hasta 8 colores.');
                 return;
             }
 
+            const stopId = `stop-${Date.now()}-${gradientStopSerial++}`;
             gradientMapSettings.stops.push({
-                id: `stop-${Date.now()}-${gradientStopSerial++}`,
+                id: stopId,
                 label: `Color ${gradientMapSettings.stops.length + 1}`,
-                color: '#ffffff',
-                position: 0.5
+                color: sampleGradientColorAt(position),
+                position: clamp01(position)
             });
-
-            rebalanceGradientStopsByOrder();
+            gradientMapSettings.selectedStopId = stopId;
             renderGradientStopsUI();
             applyGradientMapState();
         }
@@ -1231,99 +1290,162 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         function removeGradientStop(stopId) {
             if (gradientMapSettings.stops.length <= 2) return;
             gradientMapSettings.stops = gradientMapSettings.stops.filter((stop) => stop.id !== stopId);
-            rebalanceGradientStopsByOrder();
+            const fallbackStop = getOrderedGradientStops()[Math.max(0, gradientMapSettings.stops.length - 1)] || gradientMapSettings.stops[0] || null;
+            gradientMapSettings.selectedStopId = fallbackStop?.id || null;
             renderGradientStopsUI();
             applyGradientMapState();
         }
 
-        function moveGradientStop(draggedId, targetId) {
-            if (draggedId === targetId) return;
+        function updateGradientStopPosition(stopId, position) {
+            const stop = getGradientStopById(stopId);
+            if (!stop) return;
+            stop.position = clamp01(position);
+            renderGradientStopsUI();
+            applyGradientMapState();
+        }
 
-            const draggedIndex = gradientMapSettings.stops.findIndex((stop) => stop.id === draggedId);
-            const targetIndex = gradientMapSettings.stops.findIndex((stop) => stop.id === targetId);
-            if (draggedIndex < 0 || targetIndex < 0) return;
-
-            const [draggedStop] = gradientMapSettings.stops.splice(draggedIndex, 1);
-            gradientMapSettings.stops.splice(targetIndex, 0, draggedStop);
-            rebalanceGradientStopsByOrder();
+        function updateGradientStopColor(stopId, color) {
+            const stop = getGradientStopById(stopId);
+            if (!stop) return;
+            stop.color = colorToHexString(color);
             renderGradientStopsUI();
             applyGradientMapState();
         }
 
         function renderGradientStopsUI() {
             if (!gradientStopsRoot) return;
+            ensureGradientSelection();
+            const orderedStops = getOrderedGradientStops();
+            const selectedStop = ensureGradientSelection();
 
             gradientStopsRoot.innerHTML = '';
 
-            const toolbar = document.createElement('div');
-            toolbar.className = 'gradient-stops-toolbar';
-            toolbar.innerHTML = `
-                <span>Stops</span>
-                <button type="button" class="gradient-stop-add" title="Agregar color">+</button>
-            `;
-            toolbar.querySelector('.gradient-stop-add').addEventListener('click', addGradientStop);
-            gradientStopsRoot.appendChild(toolbar);
+            const editor = document.createElement('div');
+            editor.className = 'gradient-editor';
 
-            gradientMapSettings.stops.forEach((stop) => {
-                const row = document.createElement('div');
-                row.className = 'gradient-stop-row';
-                row.draggable = false;
-                row.dataset.stopId = stop.id;
-                row.innerHTML = `
-                    <span class="gradient-stop-handle" title="Arrastrar prioridad">::</span>
-                    <input class="gradient-stop-label" type="text" value="${stop.label}" aria-label="Nombre del color">
-                    <input class="gradient-stop-color" type="color" value="${stop.color}" aria-label="Color">
-                    <input class="gradient-stop-position" type="range" min="0" max="1" step="0.01" value="${stop.position}" aria-label="Posicion tonal">
-                    <span class="gradient-stop-value">${stop.position.toFixed(2)}</span>
-                    <button class="gradient-stop-remove" type="button" title="Eliminar color">x</button>
+            const editorHeader = document.createElement('div');
+            editorHeader.className = 'gradient-editor__header';
+            editorHeader.innerHTML = '<span>Editor de degradado</span><span>Click en la barra para agregar</span>';
+            editor.appendChild(editorHeader);
+
+            const previewWrap = document.createElement('div');
+            previewWrap.className = 'gradient-editor__preview';
+
+            const previewBar = document.createElement('div');
+            previewBar.className = 'gradient-editor__bar';
+            previewBar.style.background = buildGradientPreviewCss();
+            previewBar.addEventListener('click', (event) => {
+                if (event.target.closest('.gradient-editor__stop')) return;
+                const rect = previewBar.getBoundingClientRect();
+                addGradientStop((event.clientX - rect.left) / Math.max(rect.width, 1));
+            });
+
+            const stopsLayer = document.createElement('div');
+            stopsLayer.className = 'gradient-editor__stops';
+
+            orderedStops.forEach((stop) => {
+                const stopButton = document.createElement('button');
+                stopButton.type = 'button';
+                stopButton.className = `gradient-editor__stop${selectedStop?.id === stop.id ? ' is-active' : ''}`;
+                stopButton.style.left = `${stop.position * 100}%`;
+                stopButton.style.setProperty('--stop-color', stop.color);
+                stopButton.title = `${formatGradientPercent(stop.position)} - ${stop.color}`;
+                stopButton.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    selectGradientStop(stop.id);
+                });
+                stopButton.addEventListener('pointerdown', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    activeGradientDragId = stop.id;
+                    selectGradientStop(stop.id);
+                });
+                stopsLayer.appendChild(stopButton);
+            });
+
+            previewWrap.appendChild(previewBar);
+            previewWrap.appendChild(stopsLayer);
+            editor.appendChild(previewWrap);
+
+            if (selectedStop) {
+                const selectedPanel = document.createElement('div');
+                selectedPanel.className = 'gradient-editor__selected';
+                selectedPanel.innerHTML = `
+                    <div class="gradient-editor__selected-title">Parada seleccionada</div>
+                    <div class="gradient-editor__selected-controls">
+                        <label class="gradient-editor__field">
+                            <span>Color</span>
+                            <input class="gradient-editor__color" type="color" value="${selectedStop.color}">
+                        </label>
+                        <label class="gradient-editor__field gradient-editor__field--position">
+                            <span>Ubicacion</span>
+                            <div class="gradient-editor__position-wrap">
+                                <input class="gradient-editor__number" type="number" min="0" max="100" step="1" value="${Math.round(selectedStop.position * 100)}">
+                                <span>%</span>
+                            </div>
+                        </label>
+                        <button type="button" class="gradient-stop-remove"${gradientMapSettings.stops.length <= 2 ? ' disabled' : ''}>Eliminar</button>
+                    </div>
                 `;
 
-                const handle = row.querySelector('.gradient-stop-handle');
-                handle.draggable = true;
+                selectedPanel.querySelector('.gradient-editor__color').addEventListener('input', (event) => {
+                    updateGradientStopColor(selectedStop.id, event.target.value);
+                });
+                selectedPanel.querySelector('.gradient-editor__number').addEventListener('input', (event) => {
+                    updateGradientStopPosition(selectedStop.id, Number(event.target.value) / 100);
+                });
+                selectedPanel.querySelector('.gradient-stop-remove').addEventListener('click', () => {
+                    removeGradientStop(selectedStop.id);
+                });
 
-                handle.addEventListener('dragstart', (event) => {
+                editor.appendChild(selectedPanel);
+            }
+
+            const listTitle = document.createElement('div');
+            listTitle.className = 'gradient-editor__list-title';
+            listTitle.innerHTML = '<span>Paradas de color</span><span>Ordenadas por posicion</span>';
+            editor.appendChild(listTitle);
+
+            const list = document.createElement('div');
+            list.className = 'gradient-stop-list';
+
+            orderedStops.forEach((stop) => {
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = `gradient-stop-item${selectedStop?.id === stop.id ? ' is-active' : ''}`;
+                item.innerHTML = `
+                    <span class="gradient-stop-item__swatch" style="background:${stop.color}"></span>
+                    <span class="gradient-stop-item__hex">${stop.color.toUpperCase()}</span>
+                    <span class="gradient-stop-item__pos">${formatGradientPercent(stop.position)}</span>
+                    <span class="gradient-stop-item__close">×</span>
+                `;
+                item.addEventListener('click', () => {
+                    selectGradientStop(stop.id);
+                });
+                item.querySelector('.gradient-stop-item__close').addEventListener('click', (event) => {
                     event.stopPropagation();
-                    event.dataTransfer.setData('text/plain', stop.id);
-                    event.dataTransfer.effectAllowed = 'move';
-                    row.classList.add('is-dragging');
-                });
-
-                handle.addEventListener('dragend', () => {
-                    row.classList.remove('is-dragging');
-                });
-
-                row.addEventListener('dragover', (event) => {
-                    event.preventDefault();
-                    event.dataTransfer.dropEffect = 'move';
-                });
-
-                row.addEventListener('drop', (event) => {
-                    event.preventDefault();
-                    moveGradientStop(event.dataTransfer.getData('text/plain'), stop.id);
-                });
-
-                row.querySelector('.gradient-stop-label').addEventListener('input', (event) => {
-                    stop.label = event.target.value || 'Color';
-                });
-
-                row.querySelector('.gradient-stop-color').addEventListener('input', (event) => {
-                    stop.color = event.target.value;
-                    applyGradientMapState();
-                });
-
-                row.querySelector('.gradient-stop-position').addEventListener('input', (event) => {
-                    stop.position = clamp01(Number(event.target.value));
-                    row.querySelector('.gradient-stop-value').textContent = stop.position.toFixed(2);
-                    applyGradientMapState();
-                });
-
-                row.querySelector('.gradient-stop-remove').addEventListener('click', () => {
                     removeGradientStop(stop.id);
                 });
-
-                gradientStopsRoot.appendChild(row);
+                list.appendChild(item);
             });
+
+            editor.appendChild(list);
+            gradientStopsRoot.appendChild(editor);
         }
+
+        window.addEventListener('pointermove', (event) => {
+            if (!activeGradientDragId || !gradientStopsRoot) return;
+            const previewBar = gradientStopsRoot.querySelector('.gradient-editor__bar');
+            if (!previewBar) return;
+            const rect = previewBar.getBoundingClientRect();
+            updateGradientStopPosition(activeGradientDragId, (event.clientX - rect.left) / Math.max(rect.width, 1));
+        });
+
+        window.addEventListener('pointerup', () => {
+            if (!activeGradientDragId) return;
+            activeGradientDragId = null;
+            scheduleHistoryCommit();
+        });
 
         function applyGlassState() {
             if (glassSettings.enabled) {
@@ -1512,6 +1634,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
                     enabled: gradientMapSettings.enabled,
                     amount: gradientMapSettings.amount,
                     smoothness: gradientMapSettings.smoothness,
+                    selectedStopId: gradientMapSettings.selectedStopId,
                     stops: cloneStops(gradientMapSettings.stops)
                 },
                 geometry: {
@@ -1604,6 +1727,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             gradientMapSettings.enabled = snapshot.gradientMap.enabled;
             gradientMapSettings.amount = snapshot.gradientMap.amount;
             gradientMapSettings.smoothness = snapshot.gradientMap.smoothness;
+            gradientMapSettings.selectedStopId = snapshot.gradientMap.selectedStopId || snapshot.gradientMap.stops?.[0]?.id || null;
             gradientMapSettings.stops = cloneStops(snapshot.gradientMap.stops);
 
             geometrySettings.depth = snapshot.geometry.depth;
@@ -1911,10 +2035,10 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         gradientMapFolder.add(gradientMapSettings, 'amount', 0.0, 1.0, 0.01).name('Amount').onChange(() => {
             applyGradientMapState();
         });
-        gradientMapFolder.add(gradientMapSettings, 'smoothness', 0.01, 1.0, 0.01).name('Smoothness').onChange(() => {
+        gradientMapFolder.add(gradientMapSettings, 'smoothness', 0.0, 1.0, 0.01).name('Smoothness').onChange(() => {
             applyGradientMapState();
+            renderGradientStopsUI();
         });
-        gradientMapFolder.add(gradientMapSettings, 'addStop').name('+ Add Color');
         gradientStopsRoot = document.createElement('div');
         gradientStopsRoot.className = 'gradient-stops-ui';
         (gradientMapFolder.domElement.querySelector('.children') || gradientMapFolder.domElement).appendChild(gradientStopsRoot);
