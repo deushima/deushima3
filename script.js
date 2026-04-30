@@ -27,10 +27,64 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         const hudBrandLogo = document.getElementById('hudBrandLogo');
         const fileInput = document.getElementById('fileInput');
         const textureInput = document.getElementById('textureInput');
+        const musicToggle = document.getElementById('musicToggle');
+        const musicPlayer = document.getElementById('musicPlayer');
+
+        const musicPlaylist = [
+            { title: 'Meditation', src: './Song/Meditation.mp3' }
+        ];
+        let activeMusicTrack = 0;
 
         document.title = 'Deushima Liquid Metal Workspace';
         document.querySelectorAll('body > .sound-embed, body > .site-footer').forEach((node) => node.remove());
         document.querySelectorAll('.cursor-follower').forEach((node) => node.remove());
+
+        function syncMusicButton() {
+            if (!musicToggle || !musicPlayer || !musicPlaylist.length) return;
+            const track = musicPlaylist[activeMusicTrack];
+            const isPlaying = !musicPlayer.paused;
+            musicToggle.classList.toggle('is-playing', isPlaying);
+            musicToggle.setAttribute('aria-pressed', String(isPlaying));
+            musicToggle.setAttribute('aria-label', isPlaying ? `Pausar ${track.title}` : `Reproducir ${track.title}`);
+            musicToggle.title = track.title;
+        }
+
+        function loadMusicTrack(index) {
+            if (!musicPlayer || !musicPlaylist.length) return;
+            activeMusicTrack = (index + musicPlaylist.length) % musicPlaylist.length;
+            musicPlayer.src = musicPlaylist[activeMusicTrack].src;
+            musicPlayer.volume = 0.58;
+            syncMusicButton();
+        }
+
+        async function toggleMusicPlayback() {
+            if (!musicPlayer || !musicPlaylist.length) return;
+            if (!musicPlayer.src) loadMusicTrack(activeMusicTrack);
+
+            if (musicPlayer.paused) {
+                try {
+                    await musicPlayer.play();
+                } catch (error) {
+                    console.warn('No se pudo reproducir el audio local.', error);
+                }
+            } else {
+                musicPlayer.pause();
+            }
+
+            syncMusicButton();
+        }
+
+        musicToggle?.addEventListener('click', toggleMusicPlayback);
+        musicPlayer?.addEventListener('play', syncMusicButton);
+        musicPlayer?.addEventListener('pause', syncMusicButton);
+        musicPlayer?.addEventListener('ended', () => {
+            loadMusicTrack(activeMusicTrack + 1);
+            musicPlayer.play().catch((error) => {
+                console.warn('No se pudo continuar la radio local.', error);
+                syncMusicButton();
+            });
+        });
+        loadMusicTrack(activeMusicTrack);
 
         if (hudBrandLogo) {
             hudBrandLogo.innerHTML = INLINE_INITIAL_SVG || `<img src="${INITIAL_SVG_URL}" alt="Deushima">`;

@@ -251,7 +251,8 @@ body > .site-footer {
     gap: 10px;
 }
 
-.hud-footer__links a {
+.hud-footer__links a,
+.music-toggle {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -263,16 +264,37 @@ body > .site-footer {
     transition: transform 160ms ease, background 160ms ease, color 160ms ease;
 }
 
-.hud-footer__links a:hover {
+.music-toggle {
+    padding: 0;
+    cursor: pointer;
+}
+
+.hud-footer__links a:hover,
+.music-toggle:hover,
+.music-toggle.is-playing {
     transform: translateY(-1px);
     background: rgba(255, 255, 255, 0.08);
     color: #ffffff;
 }
 
-.hud-footer__links svg {
+.hud-footer__links svg,
+.music-toggle svg {
     width: 16px;
     height: 16px;
     fill: currentColor;
+}
+
+.music-toggle__icon--pause,
+.music-toggle.is-playing .music-toggle__icon--play {
+    display: none;
+}
+
+.music-toggle.is-playing .music-toggle__icon--pause {
+    display: block;
+}
+
+.hud-footer__links audio {
+    display: none;
 }
 
 .sound-embed {
@@ -474,9 +496,16 @@ body > .site-footer {
 .lil-gui *,
 .hud-footer__links a,
 .hud-footer__links a *,
+.music-toggle,
+.music-toggle *,
 .sound-embed,
 .sound-embed * {
     cursor: auto !important;
+}
+
+.music-toggle,
+.music-toggle * {
+    cursor: pointer !important;
 }
 
 .controls-drawer__body > .lil-gui.root {
