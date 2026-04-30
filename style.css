@@ -250,8 +250,23 @@ body > .site-footer {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding-top: 4px;
-    transform: translateY(-4px);
+    position: relative;
+    width: fit-content;
+    margin-left: 28px;
+    padding: 6px 0 0 12px;
+    transform: translateY(-6px);
+}
+
+.hud-footer__links::before {
+    content: "";
+    position: absolute;
+    left: -28px;
+    top: 7px;
+    width: 24px;
+    height: 34px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.025);
+    pointer-events: none;
 }
 
 .hud-footer__links a,
