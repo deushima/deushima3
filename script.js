@@ -29,11 +29,14 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         const textureInput = document.getElementById('textureInput');
         const musicToggle = document.getElementById('musicToggle');
         const musicPlayer = document.getElementById('musicPlayer');
+        const musicVolume = document.getElementById('musicVolume');
+        const musicVolumeValue = document.getElementById('musicVolumeValue');
 
         const musicPlaylist = [
             { title: 'Meditation', src: './Song/Meditation.mp3' }
         ];
         let activeMusicTrack = 0;
+        let musicVolumeLevel = 0.58;
 
         document.title = 'Deushima Liquid Metal Workspace';
         document.querySelectorAll('body > .sound-embed, body > .site-footer').forEach((node) => node.remove());
@@ -49,11 +52,18 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             musicToggle.title = track.title;
         }
 
+        function syncMusicVolume() {
+            if (!musicPlayer) return;
+            musicPlayer.volume = musicVolumeLevel;
+            if (musicVolume) musicVolume.value = String(Math.round(musicVolumeLevel * 100));
+            if (musicVolumeValue) musicVolumeValue.textContent = `${Math.round(musicVolumeLevel * 100)}%`;
+        }
+
         function loadMusicTrack(index) {
             if (!musicPlayer || !musicPlaylist.length) return;
             activeMusicTrack = (index + musicPlaylist.length) % musicPlaylist.length;
             musicPlayer.src = musicPlaylist[activeMusicTrack].src;
-            musicPlayer.volume = 0.58;
+            syncMusicVolume();
             syncMusicButton();
         }
 
@@ -83,6 +93,10 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
                 console.warn('No se pudo continuar la radio local.', error);
                 syncMusicButton();
             });
+        });
+        musicVolume?.addEventListener('input', (event) => {
+            musicVolumeLevel = Math.min(1, Math.max(0, Number(event.target.value) / 100));
+            syncMusicVolume();
         });
         loadMusicTrack(activeMusicTrack);
 
