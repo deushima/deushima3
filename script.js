@@ -106,7 +106,30 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         const camera = new THREE.PerspectiveCamera(45, initialViewport.width / initialViewport.height, 0.1, 1000);
         camera.position.set(0, 0, compositionSettings.cameraDistance);
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+        function createRendererWithFallback() {
+            const rendererProfiles = [
+                { antialias: true, alpha: true, preserveDrawingBuffer: true, powerPreference: 'high-performance' },
+                { antialias: false, alpha: true, preserveDrawingBuffer: true, powerPreference: 'default' },
+                { antialias: false, alpha: false, preserveDrawingBuffer: false, powerPreference: 'low-power' }
+            ];
+
+            let lastError = null;
+            for (const profile of rendererProfiles) {
+                try {
+                    return new THREE.WebGLRenderer(profile);
+                } catch (error) {
+                    lastError = error;
+                    console.warn('WebGL renderer profile failed, retrying with safer settings.', profile, error);
+                }
+            }
+
+            const firefoxHint = /firefox/i.test(navigator.userAgent)
+                ? ' Firefox suele fallar por aceleracion por hardware, una extension de privacidad/adblock o el driver GPU.'
+                : '';
+            throw new Error(`No se pudo crear el contexto WebGL.${firefoxHint} ${lastError?.message || ''}`.trim());
+        }
+
+        const renderer = createRendererWithFallback();
         renderer.setSize(initialViewport.width, initialViewport.height);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.autoClear = true;
@@ -115,6 +138,10 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.3; 
         renderer.domElement.classList.add('workbench-canvas');
+        renderer.domElement.addEventListener('webglcontextlost', (event) => {
+            event.preventDefault();
+            throw new Error('WebGL context lost. Revisa Firefox: aceleracion por hardware, extensiones o bloqueo del driver GPU.');
+        }, false);
         (workbenchViewport || document.body).appendChild(renderer.domElement);
 
         const glowSettings = {
@@ -680,6 +707,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 
         liquidMaterial.userData = {
             uTime: { value: 0 },
+            uLoopDuration: { value: 30.0 },
             uSpeed: { value: 0.0 },         
             uScale: { value: 0.0001 },       
             uDistortion: { value: 0.485 },    
@@ -698,9 +726,11 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             frame: 0.0
         };
         let fluidRenderTime = 0.0;
+        const fluidLoopDuration = liquidMaterial.userData.uLoopDuration.value;
 
         liquidMaterial.onBeforeCompile = (shader) => {
             shader.uniforms.uTime = liquidMaterial.userData.uTime;
+            shader.uniforms.uLoopDuration = liquidMaterial.userData.uLoopDuration;
             shader.uniforms.uSpeed = liquidMaterial.userData.uSpeed;
             shader.uniforms.uScale = liquidMaterial.userData.uScale;
             shader.uniforms.uDistortion = liquidMaterial.userData.uDistortion;
@@ -731,6 +761,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 
             shader.fragmentShader = `
                 uniform float uTime;
+                uniform float uLoopDuration;
                 uniform float uSpeed;
                 uniform float uScale;
                 uniform float uDistortion;
@@ -780,18 +811,25 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
                 
                 // Shape aware inflation
                 p.z += smoothDist * uShapeReactivity * 150.0 * uScale;
+
+                float loopPhase = (uTime / max(uLoopDuration, 0.001)) * 6.28318530718;
+                vec2 loopOrbit = vec2(cos(loopPhase), sin(loopPhase));
+                vec2 loopOrbitDetail = vec2(cos(loopPhase * 2.0 + 0.9), sin(loopPhase * 2.0 + 0.9));
+                vec3 loopVecA = vec3(loopOrbit * 0.95, sin(loopPhase * 2.0) * 0.75);
+                vec3 loopVecB = vec3(loopOrbitDetail * 0.8, cos(loopPhase * 2.0 + 1.7) * 0.7);
                 
                 // Flow along contours
                 vec2 contourTangent = vec2(-maskGrad.y, maskGrad.x);
                 float contourFlow = 0.5 + bevelRedirect * uBevelFlowMix * 1.6;
-                p.xy += contourTangent * (uTime * uSpeed * contourFlow);
-                p.y -= uTime * uSpeed * 0.1;
+                p.xy += contourTangent * (loopOrbit.x * uSpeed * contourFlow * 7.5);
+                p.xy += loopOrbitDetail * (uSpeed * 0.75);
+                p.y -= loopOrbit.y * uSpeed * 0.85;
                 
                 // Domain Warping
                 vec3 warp;
-                warp.x = snoise(p + vec3(0.0, 0.0, uTime * 0.1));
-                warp.y = snoise(p + vec3(114.5, 22.1, uTime * 0.1));
-                warp.z = snoise(p + vec3(233.2, 51.5, uTime * 0.1));
+                warp.x = snoise(p + loopVecA);
+                warp.y = snoise(p + vec3(114.5, 22.1, 0.0) + loopVecB);
+                warp.z = snoise(p + vec3(233.2, 51.5, 0.0) + vec3(loopOrbit * 0.72, sin(loopPhase * 3.0) * 0.52));
                 vec3 warpedP = p + warp * 1.5; 
                 
                 // Calculate analytical normal
@@ -1735,7 +1773,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
                 fluidFrameController.updateDisplay();
             }
         });
-        const fluidFrameController = effectFolder.add(fluidPlaybackSettings, 'frame', 0.0, 30.0, 0.01).name('Fluid Frame').onChange((value) => {
+        const fluidFrameController = effectFolder.add(fluidPlaybackSettings, 'frame', 0.0, fluidLoopDuration, 0.01).name('Fluid Frame').onChange((value) => {
             if (fluidPlaybackSettings.paused) {
                 fluidRenderTime = value;
                 liquidMaterial.userData.uTime.value = value;
@@ -2299,7 +2337,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             if (fluidPlaybackSettings.paused) {
                 fluidRenderTime = fluidPlaybackSettings.frame;
             } else {
-                fluidRenderTime = elapsedTime % 30.0;
+                fluidRenderTime = elapsedTime % fluidLoopDuration;
                 fluidPlaybackSettings.frame = fluidRenderTime;
                 fluidFrameController.updateDisplay();
             }
