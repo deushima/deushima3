@@ -2539,23 +2539,23 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         ];
 
         const hudToolCatalog = [
-            { id: 'scene', index: '01', title: 'Escena', meta: 'Visual / Fondo', description: 'Controla el color de fondo de la mesa de trabajo para decidir si el logo vive sobre un negro pleno o sobre una base distinta.', categories: ['all', 'visual'], folder: sceneFolder },
-            { id: 'fluid', index: '02', title: 'Dinamica Fluida', meta: 'Simulacion / Fluido', description: 'Define la vibracion liquida del metal, cuanto se desplaza la materia sobre la forma y que tan nitidos se mantienen sus bordes.', categories: ['all', 'fluido'], folder: effectFolder },
-            { id: 'iridescence', index: '03', title: 'Iridescencia', meta: 'Color / Refraccion', description: 'Anade el desvio cromatico interno del material y regula el espesor que determina como aparecen esos matices en la superficie.', categories: ['all', 'material', 'color'], folder: iridescenceFolder },
-            { id: 'material', index: '04', title: 'Material Base', meta: 'Metal / Superficie', description: 'Ajusta el cuerpo principal del logo: rugosidad, nivel metalico y la capa de brillo superior que define su pulido general.', categories: ['all', 'material'], folder: materialFolder },
-            { id: 'structure-fill', index: '05', title: 'Estructura Completa', meta: 'Color / Relleno', description: 'Rellena las zonas oscuras de la estructura con un color editable. Por defecto usa plateado para que laterales y parte trasera no queden negros.', categories: ['all', 'material', 'visual', 'color'], folder: structureFillFolder },
-            { id: 'glass', index: '06', title: 'Textura Glass', meta: 'Refraccion / Vidrio', description: 'Modifica la transparencia, la refraccion y el tinte interno para llevar el logo hacia un look de vidrio o cristal liquido.', categories: ['all', 'material', 'visual'], folder: glassFolder },
-            { id: 'glow', index: '07', title: 'Glow', meta: 'Luz / Halo', description: 'Controla el halo alrededor del logo para sumar presencia sin romper la limpieza del diseno. Ideal para dar volumen sutil.', categories: ['all', 'luz', 'post'], folder: glowFolder },
-            { id: 'chromatic', index: '08', title: 'Cromatico', meta: 'Postproceso / Chrome', description: 'Define la separacion cromatica, el contraste y la exposicion blanca del render para darle un acabado mas editorial o mas agresivo.', categories: ['all', 'post', 'color'], folder: chromaticFolder },
-            { id: 'image-filters', index: '09', title: 'Filtros', meta: 'Color / Presets', description: 'Aplica filtros de imagen con mini previews de material/color. Sirve para probar acabados tonales rapidos sin alterar el material base del logo.', categories: ['all', 'post', 'visual', 'color'], folder: imageFiltersFolder },
-            { id: 'edge-smoothing', index: '10', title: 'Suavizar Bordes', meta: 'Postproceso / Anti Alias', description: 'Activa un suavizado final sobre el render para reducir bordes pixelados sin cambiar la forma ni el material del logo.', categories: ['all', 'post', 'visual'], folder: edgeSmoothFolder },
-            { id: 'gradient-map', index: '11', title: 'Gradient Map', meta: 'Color / Mapa Tonal', description: 'Aplica un mapa de degradado al render completo, como en Photoshop: las sombras toman un color y las luces otro, mezclandose segun la luminancia.', categories: ['all', 'post', 'color'], folder: gradientMapFolder },
-            { id: 'geometry', index: '12', title: 'Geometria', meta: 'Extrusion / Forma', description: 'Aqui decides el volumen real del logo: profundidad, bisel y la lectura general de la pieza en el espacio.', categories: ['all', 'geometria'], folder: geometryFolder },
-            { id: 'bevel', index: '13', title: 'Dinamica de Bisel', meta: 'Geometria / Flujo', description: 'Redirige el comportamiento del fluido hacia el bisel para que la materia siga el contorno de la forma con mas intencion.', categories: ['all', 'geometria', 'fluido'], folder: bevelFolder },
-            { id: 'environment', index: '14', title: 'Entorno', meta: 'Iluminacion / Textura', description: 'Permite cargar una textura de entorno para alterar reflejos, iluminacion y, si quieres, la lectura del propio material del logo.', categories: ['all', 'entorno', 'visual'], folder: environmentFolder },
-            { id: 'export-360', index: '15', title: 'Export 360', meta: 'Video / Rotacion', description: 'Exporta una vuelta completa de 360 grados del logo sobre su eje vertical. El navegador intentara descargar MP4 y usara WebM si MP4 no esta disponible.', categories: ['all', 'archivo'], folder: export360Folder },
-            { id: 'community-presets', index: '16', title: "Preset's Comunidad", meta: 'Disenadores / Looks', description: 'Guarda y aplica presets creados por la comunidad. Deushima v1 conserva el look anterior para volver a el cuando quieras.', categories: ['all', 'presets', 'material', 'post'], folder: communityFolder },
-            { id: 'files', index: '17', title: 'Archivos', meta: 'Importacion / Exportacion', description: 'Gestiona el SVG, la carga de nuevos assets y la exportacion final en PNG con fondo o transparente, sin incluir la esfera ambiental.', categories: ['all', 'archivo'], folder: fileFolder }
+            { id: 'files', index: '01', title: 'Archivos', meta: 'Importacion / Exportacion', description: 'Gestiona el SVG, la carga de nuevos assets y la exportacion final en PNG con fondo o transparente, sin incluir la esfera ambiental.', categories: ['all', 'archivo'], folder: fileFolder, callout: 'Aca podes subir tu logo SVG' },
+            { id: 'scene', index: '02', title: 'Escena', meta: 'Visual / Fondo', description: 'Controla el color de fondo de la mesa de trabajo para decidir si el logo vive sobre un negro pleno o sobre una base distinta.', categories: ['all', 'visual'], folder: sceneFolder },
+            { id: 'fluid', index: '03', title: 'Dinamica Fluida', meta: 'Simulacion / Fluido', description: 'Define la vibracion liquida del metal, cuanto se desplaza la materia sobre la forma y que tan nitidos se mantienen sus bordes.', categories: ['all', 'fluido'], folder: effectFolder },
+            { id: 'iridescence', index: '04', title: 'Iridescencia', meta: 'Color / Refraccion', description: 'Anade el desvio cromatico interno del material y regula el espesor que determina como aparecen esos matices en la superficie.', categories: ['all', 'material', 'color'], folder: iridescenceFolder },
+            { id: 'material', index: '05', title: 'Material Base', meta: 'Metal / Superficie', description: 'Ajusta el cuerpo principal del logo: rugosidad, nivel metalico y la capa de brillo superior que define su pulido general.', categories: ['all', 'material'], folder: materialFolder },
+            { id: 'structure-fill', index: '06', title: 'Estructura Completa', meta: 'Color / Relleno', description: 'Rellena las zonas oscuras de la estructura con un color editable. Por defecto usa plateado para que laterales y parte trasera no queden negros.', categories: ['all', 'material', 'visual', 'color'], folder: structureFillFolder },
+            { id: 'glass', index: '07', title: 'Textura Glass', meta: 'Refraccion / Vidrio', description: 'Modifica la transparencia, la refraccion y el tinte interno para llevar el logo hacia un look de vidrio o cristal liquido.', categories: ['all', 'material', 'visual'], folder: glassFolder },
+            { id: 'glow', index: '08', title: 'Glow', meta: 'Luz / Halo', description: 'Controla el halo alrededor del logo para sumar presencia sin romper la limpieza del diseno. Ideal para dar volumen sutil.', categories: ['all', 'luz', 'post'], folder: glowFolder },
+            { id: 'chromatic', index: '09', title: 'Cromatico', meta: 'Postproceso / Chrome', description: 'Define la separacion cromatica, el contraste y la exposicion blanca del render para darle un acabado mas editorial o mas agresivo.', categories: ['all', 'post', 'color'], folder: chromaticFolder },
+            { id: 'image-filters', index: '10', title: 'Filtros', meta: 'Color / Presets', description: 'Aplica filtros de imagen con mini previews de material/color. Sirve para probar acabados tonales rapidos sin alterar el material base del logo.', categories: ['all', 'post', 'visual', 'color'], folder: imageFiltersFolder },
+            { id: 'edge-smoothing', index: '11', title: 'Suavizar Bordes', meta: 'Postproceso / Anti Alias', description: 'Activa un suavizado final sobre el render para reducir bordes pixelados sin cambiar la forma ni el material del logo.', categories: ['all', 'post', 'visual'], folder: edgeSmoothFolder },
+            { id: 'gradient-map', index: '12', title: 'Gradient Map', meta: 'Color / Mapa Tonal', description: 'Aplica un mapa de degradado al render completo, como en Photoshop: las sombras toman un color y las luces otro, mezclandose segun la luminancia.', categories: ['all', 'post', 'color'], folder: gradientMapFolder },
+            { id: 'geometry', index: '13', title: 'Geometria', meta: 'Extrusion / Forma', description: 'Aqui decides el volumen real del logo: profundidad, bisel y la lectura general de la pieza en el espacio.', categories: ['all', 'geometria'], folder: geometryFolder },
+            { id: 'bevel', index: '14', title: 'Dinamica de Bisel', meta: 'Geometria / Flujo', description: 'Redirige el comportamiento del fluido hacia el bisel para que la materia siga el contorno de la forma con mas intencion.', categories: ['all', 'geometria', 'fluido'], folder: bevelFolder },
+            { id: 'environment', index: '15', title: 'Entorno', meta: 'Iluminacion / Textura', description: 'Permite cargar una textura de entorno para alterar reflejos, iluminacion y, si quieres, la lectura del propio material del logo.', categories: ['all', 'entorno', 'visual'], folder: environmentFolder },
+            { id: 'export-360', index: '16', title: 'Export 360', meta: 'Video / Rotacion', description: 'Exporta una vuelta completa de 360 grados del logo sobre su eje vertical. El navegador intentara descargar MP4 y usara WebM si MP4 no esta disponible.', categories: ['all', 'archivo'], folder: export360Folder },
+            { id: 'community-presets', index: '17', title: "Preset's Comunidad", meta: 'Disenadores / Looks', description: 'Guarda y aplica presets creados por la comunidad. Deushima v1 conserva el look anterior para volver a el cuando quieras.', categories: ['all', 'presets', 'material', 'post'], folder: communityFolder }
         ];
 
         const hudFilterCatalog = [
@@ -2570,7 +2570,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             { id: 'archivo', label: 'Archivo' }
         ];
 
-        let activeToolId = 'fluid';
+        let activeToolId = 'files';
         let hoveredToolId = null;
         let activeFilterId = 'all';
 
@@ -2609,6 +2609,10 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
                 const card = document.createElement('button');
                 card.type = 'button';
                 card.className = 'tool-card';
+                if (tool.callout) {
+                    card.classList.add('tool-card--callout');
+                    card.dataset.callout = tool.callout;
+                }
                 card.dataset.toolId = tool.id;
                 card.innerHTML = `
                     <span class="tool-card__index">${tool.index}</span>
@@ -2617,6 +2621,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
                         <span class="tool-card__meta">${tool.meta}</span>
                     </span>
                     <span class="tool-card__arrow">↗</span>
+                    ${tool.callout ? `<span class="tool-card__callout">${tool.callout}</span>` : ''}
                 `;
 
                 card.querySelector('.tool-card__arrow').innerHTML = '&#8599;';
