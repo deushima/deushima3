@@ -2539,7 +2539,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         ];
 
         const hudToolCatalog = [
-            { id: 'files', index: '01', title: 'Archivos', meta: 'Importacion / Exportacion', description: 'Gestiona el SVG, la carga de nuevos assets y la exportacion final en PNG con fondo o transparente, sin incluir la esfera ambiental.', categories: ['all', 'archivo'], folder: fileFolder, callout: 'Aca podes subir tu logo SVG' },
+            { id: 'files', index: '01', title: 'Archivos', meta: 'Importacion / Exportacion', description: 'Gestiona el SVG, la carga de nuevos assets y la exportacion final en PNG con fondo o transparente, sin incluir la esfera ambiental.', categories: ['all', 'archivo'], folder: fileFolder, callout: 'probá tu logo' },
             { id: 'scene', index: '02', title: 'Escena', meta: 'Visual / Fondo', description: 'Controla el color de fondo de la mesa de trabajo para decidir si el logo vive sobre un negro pleno o sobre una base distinta.', categories: ['all', 'visual'], folder: sceneFolder },
             { id: 'fluid', index: '03', title: 'Dinamica Fluida', meta: 'Simulacion / Fluido', description: 'Define la vibracion liquida del metal, cuanto se desplaza la materia sobre la forma y que tan nitidos se mantienen sus bordes.', categories: ['all', 'fluido'], folder: effectFolder },
             { id: 'iridescence', index: '04', title: 'Iridescencia', meta: 'Color / Refraccion', description: 'Anade el desvio cromatico interno del material y regula el espesor que determina como aparecen esos matices en la superficie.', categories: ['all', 'material', 'color'], folder: iridescenceFolder },
@@ -2573,6 +2573,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         let activeToolId = 'files';
         let hoveredToolId = null;
         let activeFilterId = 'all';
+        let fileCalloutRoot = null;
 
         function setDrawerState(isOpen) {
             if (!controlsDrawer || !controlsToggle) return;
@@ -2599,6 +2600,36 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
             if (toolInfoTitle) toolInfoTitle.textContent = tool.title;
             if (toolInfoDescription) toolInfoDescription.textContent = tool.description;
             if (controlsDrawerTitle) controlsDrawerTitle.textContent = tool.title;
+        }
+
+        function ensureFileCallout() {
+            if (fileCalloutRoot) return fileCalloutRoot;
+            fileCalloutRoot = document.createElement('div');
+            fileCalloutRoot.className = 'hud-file-callout';
+            fileCalloutRoot.hidden = true;
+            fileCalloutRoot.setAttribute('aria-hidden', 'true');
+            fileCalloutRoot.innerHTML = `
+                <span class="hud-file-callout__line"></span>
+                <span class="hud-file-callout__dot"></span>
+                <span class="hud-file-callout__text">probá tu logo</span>
+            `;
+            document.body.appendChild(fileCalloutRoot);
+            return fileCalloutRoot;
+        }
+
+        function syncFileCallout() {
+            if (!toolListRoot) return;
+            const callout = ensureFileCallout();
+            const card = toolListRoot.querySelector('[data-tool-id="files"]');
+            if (!card || card.hidden) {
+                callout.hidden = true;
+                return;
+            }
+
+            const rect = card.getBoundingClientRect();
+            callout.style.left = `${Math.round(rect.right - 1)}px`;
+            callout.style.top = `${Math.round(rect.top + rect.height / 2)}px`;
+            callout.hidden = false;
         }
 
         function renderToolCards() {
@@ -2646,6 +2677,8 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 
                 toolListRoot.appendChild(card);
             }
+
+            syncFileCallout();
         }
 
         function renderFilters() {
@@ -2697,11 +2730,15 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
                     card.classList.toggle('is-active', card.dataset.toolId === activeToolId);
                 }
             }
+
+            syncFileCallout();
         }
 
         controlsToggle?.addEventListener('click', () => {
             setDrawerState(!controlsDrawer.classList.contains('is-open'));
         });
+        window.addEventListener('resize', syncFileCallout);
+        toolListRoot?.addEventListener('scroll', syncFileCallout, { passive: true });
 
         renderFilters();
         renderToolCards();
@@ -2709,7 +2746,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         syncFolderVisibility(activeToolId);
         updateToolCardState();
         renderInfo(hudToolCatalog.find((entry) => entry.id === activeToolId));
-        setDrawerState(true);
+        setDrawerState(false);
 
         fileInput.addEventListener('change', (event) => {
             const file = event.target.files[0];
