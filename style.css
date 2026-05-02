@@ -233,6 +233,7 @@ body > .site-footer {
     border: 1px solid rgba(255, 255, 255, 0.78);
     border-radius: 0;
     background: rgba(255, 255, 255, 0.012);
+    animation: fileCalloutCardIntro 4.8s ease forwards;
 }
 
 .tool-card--callout .tool-card__arrow {
@@ -250,6 +251,8 @@ body > .site-footer {
     align-items: center;
     pointer-events: none;
     transform: translateY(-50%);
+    opacity: 0;
+    animation: fileCalloutIntro 4.8s ease forwards;
 }
 
 .hud-file-callout[hidden] {
@@ -279,6 +282,36 @@ body > .site-footer {
     font: 760 10px/1.12 "Inter Variable", sans-serif;
     letter-spacing: 0.1em;
     text-transform: uppercase;
+}
+
+@keyframes fileCalloutIntro {
+    0% {
+        opacity: 0;
+    }
+    21%,
+    62% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+        visibility: hidden;
+    }
+}
+
+@keyframes fileCalloutCardIntro {
+    0% {
+        border-color: rgba(255, 255, 255, 0);
+        background: rgba(255, 255, 255, 0);
+    }
+    21%,
+    62% {
+        border-color: rgba(255, 255, 255, 0.78);
+        background: rgba(255, 255, 255, 0.012);
+    }
+    100% {
+        border-color: rgba(255, 255, 255, 0.07);
+        background: transparent;
+    }
 }
 
 .hud-sidebar__footer {
